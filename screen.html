@@ -8,8 +8,11 @@ db.ref("game").on("value", s => {
   document.querySelector("#teams").innerHTML = C.teams.map(t => {
     const v = vs[t]; let cls = "team";
     if (g.phase === "answer" && v) cls += v === g.answer ? " ok" : " ng";
-    const txt = g.phase === "answer" ? (v ? v + " " + (v === g.answer ? "⭕" : "❌") : "未投票") : (v ? "回答済み" : "待機中");
-    return '<div class="' + cls + '"><b>' + t + '</b><br>' + txt + '<br><small>' + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + '</small></div>';
+    const txt = g.phase === "answer"
+  ? (v ? v + " " + (v === g.answer ? "⭕" : "❌") : "未投票")
+  : g.phase === "closed"
+    ? (v ? "回答：" + v : "未投票")
+    : (v ? "回答済み" : "待機中");
   }).join("");
 });
 </script></body></html>
