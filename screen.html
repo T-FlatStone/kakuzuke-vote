@@ -1,18 +1,217 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>格付けチェック スクリーン</title></head><body><main class="wrap"><h1>格付けチェック</h1><div id="head" class="card"></div><div id="teams" class="teams"></div></main>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <title>格付けチェック スクリーン</title>
+</head>
+
+<body>
+
+<main class="wrap">
+
+  <h1>格付けチェック</h1>
+
+  <!-- 問題・回答数・正解表示 -->
+  <div id="head" class="card"></div>
+
+  <!-- A～Pチーム表示 -->
+  <div id="teams" class="teams"></div>
+
+</main>
+
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
+<!-- このアプリの設定 -->
+<script src="config.js"></script>
+<script src="app.js"></script>
+
+
 <script>
+
+//
+// Firebase Realtime Database を監視
+//
+// game 以下に変更が入るたび、
+// スクリーン表示を自動更新する。
+//
 db.ref("game").on("value", s => {
-  const g = { ...defaults, ...s.val() }, vs = g.votes?.[g.current] || {};
-  document.querySelector("#head").innerHTML = '<div class="muted">第' + g.current + '問</div><h2>' + esc(g.question) + '</h2>' +
-    (g.phase === "answer" ? '<div class="big gold">正解は ' + esc(g.answer) + '！</div>' : '<div class="big">' + Object.keys(vs).length + ' / ' + C.teams.length + ' チーム回答</div>');
-  document.querySelector("#teams").innerHTML = C.teams.map(t => {
-    const v = vs[t]; let cls = "team";
-    if (g.phase === "answer" && v) cls += v === g.answer ? " ok" : " ng";
-    const txt = g.phase === "answer"
-  ? (v ? v + " " + (v === g.answer ? "⭕" : "❌") : "未投票")
-  : g.phase === "closed"
-    ? (v ? "回答：" + v : "未投票")
-    : (v ? "回答済み" : "待機中");
-  }).join("");
+
+  const g = {
+    ...defaults,
+    ...s.val()
+  };
+
+  // 現在の問題に対する各チームの回答
+  const vs = g.votes?.[g.current] || {};
+
+
+  // ====================================================
+  // 上部
+  // 問題番号 / 問題文 / 回答数 / 正解
+  // ====================================================
+
+  document.querySelector("#head").innerHTML =
+    '<div class="muted">' +
+      '第' + g.current + '問' +
+    '</div>' +
+
+    '<h2>' +
+      esc(g.question) +
+    '</h2>' +
+
+    (
+      g.phase === "answer"
+
+        // 正解発表後
+        ? '<div class="big gold">' +
+            '正解は ' + esc(g.answer) + '！' +
+          '</div>'
+
+        // 投票中・締切時
+        : '<div class="big">' +
+            Object.keys(vs).length +
+            ' / ' +
+            C.teams.length +
+            ' チーム回答' +
+          '</div>'
+    );
+
+
+  // ====================================================
+  // A～P 各チーム
+  // ====================================================
+
+  document.querySelector("#teams").innerHTML =
+    C.teams.map(t => {
+
+      // このチームの回答
+      // 未回答なら undefined
+      const v = vs[t];
+
+      let cls = "team";
+
+
+      // ------------------------------------------------
+      // 正解発表後
+      //
+      // 正解チーム → ok
+      // 不正解チーム → ng
+      // ------------------------------------------------
+
+      if (g.phase === "answer" && v) {
+
+        cls += v === g.answer
+          ? " ok"
+          : " ng";
+
+      }
+
+
+      // ------------------------------------------------
+      // 表示する文字
+      // ------------------------------------------------
+
+      const txt =
+
+        // =========================
+        // 正解発表後
+        // =========================
+        g.phase === "answer"
+
+          ? (
+              v
+
+                ? (
+                    v +
+                    " " +
+                    (
+                      v === g.answer
+                        ? "⭕"
+                        : "❌"
+                    )
+                  )
+
+                : "未投票"
+            )
+
+
+          // =========================
+          // 締切後
+          //
+          // ここで初めて
+          // A / B の回答を公開
+          // =========================
+
+          : g.phase === "closed"
+
+            ? (
+                v
+                  ? "回答：" + v
+                  : "未投票"
+              )
+
+
+            // =========================
+            // 投票中
+            //
+            // 回答内容は隠す
+            // =========================
+
+            : (
+                v
+                  ? "回答済み"
+                  : "待機中"
+              );
+
+
+      // ------------------------------------------------
+      // チームの現在ランク
+      // ------------------------------------------------
+
+      const rank =
+        C.ranks[
+          calcRank(
+            g.votes,
+            g.answers,
+            t
+          )
+        ];
+
+
+      // ------------------------------------------------
+      // チームカード生成
+      // ------------------------------------------------
+
+      return (
+        '<div class="' + cls + '">' +
+
+          '<b>' +
+            t +
+          '</b>' +
+
+          '<br>' +
+
+          txt +
+
+          '<br>' +
+
+          '<small>' +
+            esc(rank) +
+          '</small>' +
+
+        '</div>'
+      );
+
+    }).join("");
+
 });
-</script></body></html>
+
+</script>
+
+</body>
+</html>
