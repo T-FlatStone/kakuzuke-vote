@@ -1,0 +1,15 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>格付けチェック スクリーン</title></head><body><main class="wrap"><h1>格付けチェック</h1><div id="head" class="card"></div><div id="teams" class="teams"></div></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<script>
+db.ref("game").on("value", s => {
+  const g = { ...defaults, ...s.val() }, vs = g.votes?.[g.current] || {};
+  document.querySelector("#head").innerHTML = '<div class="muted">第' + g.current + '問</div><h2>' + esc(g.question) + '</h2>' +
+    (g.phase === "answer" ? '<div class="big gold">正解は ' + esc(g.answer) + '！</div>' : '<div class="big">' + Object.keys(vs).length + ' / ' + C.teams.length + ' チーム回答</div>');
+  document.querySelector("#teams").innerHTML = C.teams.map(t => {
+    const v = vs[t]; let cls = "team";
+    if (g.phase === "answer" && v) cls += v === g.answer ? " ok" : " ng";
+    const txt = g.phase === "answer" ? (v ? v + " " + (v === g.answer ? "⭕" : "❌") : "未投票") : (v ? "回答済み" : "待機中");
+    return '<div class="' + cls + '"><b>' + t + '</b><br>' + txt + '<br><small>' + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + '</small></div>';
+  }).join("");
+});
+</script></body></html>

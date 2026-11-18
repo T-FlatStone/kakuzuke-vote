@@ -1,0 +1,25 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>格付けチェック 投票</title></head><body><main class="wrap"><h1>格付けチェック 投票</h1><div id="app" class="card">読込中...</div></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<script>
+let cur = 1;
+const app = document.querySelector("#app");
+if (!C.teams.includes(team)) {
+  app.innerHTML = "<b>チーム指定が不正です。</b><p>URLの末尾に ?team=A ～ ?team=P を付けて開いてください。</p>";
+} else {
+  db.ref("game").on("value", s => {
+    const g = { ...defaults, ...s.val() }; cur = g.current;
+    const mine = g.votes?.[g.current]?.[team] || "";
+    const rank = C.ranks[calcRank(g.votes, g.answers, team)];
+    let h = '<h2>チーム ' + team + ' <span class="gold">（' + esc(rank) + '）</span></h2><p class="muted">第' + g.current + '問</p><h2>' + esc(g.question) + '</h2>';
+    if (g.phase === "open") {
+      h += '<div class="choices">' + g.choices.map(x => '<button type="button" class="choice ' + (mine === x ? "selected" : "") + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div><p class="muted">締切まで回答を変更できます</p>';
+    } else if (g.phase === "answer") {
+      h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' + (mine ? (mine === g.answer ? "⭕ 正解！" : "❌ 不正解") : "未投票") + '</p>';
+    } else {
+      h += '<p class="big">' + (g.phase === "closed" ? "投票締切" : "投票開始までお待ちください") + '</p>';
+    }
+    app.innerHTML = h;
+    app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => db.ref("game/votes/" + cur + "/" + team).set(b.dataset.v)));
+  });
+}
+</script></body></html>

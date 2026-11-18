@@ -1,0 +1,31 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>司会コントロール</title></head><body><main class="wrap"><h1>司会コントロール</h1>
+<div class="card row"><label>問題番号 <input id="num" type="number" min="1" value="1" style="width:90px"></label><input id="question" style="flex:1;min-width:220px" value="高級品はどっち？"><button type="button" class="ctrl" id="prepare">問題を表示</button></div>
+<div class="card row"><button type="button" class="ctrl" id="open">投票開始</button><button type="button" class="ctrl sub" id="close">締切</button><button type="button" class="ctrl" data-ans="A">A が正解</button><button type="button" class="ctrl" data-ans="B">B が正解</button><button type="button" class="ctrl sub" id="next">次の問題</button><button type="button" class="ctrl sub" id="reset">全リセット</button></div>
+<div id="status" class="card"></div></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+let g = defaults, editing = false;
+$("#question").addEventListener("focus", () => editing = true);
+$("#question").addEventListener("blur", () => editing = false);
+function prepare(n) {
+  n = Math.max(1, parseInt(n, 10) || 1);
+  db.ref("game").update({ current: n, question: $("#question").value.trim() || "問題", choices: ["A","B"], phase: "ready", answer: null });
+}
+$("#prepare").addEventListener("click", () => prepare($("#num").value));
+$("#next").addEventListener("click", () => prepare(g.current + 1));
+$("#open").addEventListener("click", () => db.ref("game/phase").set("open"));
+$("#close").addEventListener("click", () => db.ref("game/phase").set("closed"));
+document.querySelectorAll("[data-ans]").forEach(b => b.addEventListener("click", () => {
+  const x = b.dataset.ans;
+  if (!confirm(x + " を正解として発表しますか？")) return;
+  db.ref("game").update({ phase: "answer", answer: x, ["answers/" + g.current]: x });
+}));
+$("#reset").addEventListener("click", () => { if (confirm("投票・正解・格付けをすべて消去しますか？")) db.ref("game").set(defaults); });
+db.ref("game").on("value", s => {
+  g = { ...defaults, ...s.val() }; const vs = g.votes?.[g.current] || {};
+  $("#num").value = g.current; if (!editing) $("#question").value = g.question;
+  $("#status").innerHTML = "現在: 第" + g.current + "問 / " + esc(g.phase) + " / " + Object.keys(vs).length + "チーム回答<br>" +
+    C.teams.map(t => t + ":" + (vs[t] || "-") + "（" + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + "）").join("　");
+});
+</script></body></html>
