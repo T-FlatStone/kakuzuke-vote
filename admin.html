@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 <title>管理</title>
 </head>
 <body>
@@ -68,8 +68,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=2"></script>
 <script>
+if (typeof watchSetup !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
 const $ = s => document.querySelector(s);
 let G = defaults;
 let rows = [];         // 編集中の問題 [{text, n, answer}]
@@ -131,9 +132,24 @@ $("#saveSetup").addEventListener("click", async () => {
   if (bad >= 0) { alert("第" + (bad + 1) + "問の問題文または正解が未入力です"); return; }
   const timerSec = Math.min(600, Math.max(0, parseInt($("#timer").value, 10) || 0));
   $("#timer").value = timerSec;
-  await db.ref("setup").set({ questions: clean, timerSec });
-  await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: clean.length });
-  rows = clean; renderRows(); setDirty(false);
+  const btn = $("#saveSetup");
+  btn.disabled = true;
+  $("#dirty").textContent = "保存中...";
+  try {
+    await db.ref("setup").set({ questions: clean, timerSec });
+    await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: clean.length });
+    rows = clean; renderRows(); setDirty(false);
+    $("#dirty").textContent = "✔ 保存しました";
+    setTimeout(() => { if (!dirty) $("#dirty").textContent = ""; }, 3000);
+  } catch (err) {
+    console.error(err);
+    $("#dirty").textContent = "保存に失敗しました";
+    const msg = String(err && (err.code || err.message) || err);
+    alert("保存に失敗しました：" + msg +
+      (/permission/i.test(msg) ? "\n\nFirebaseのルールで setup への書き込みが許可されていません。" : ""));
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 async function loadSetup() {
