@@ -7,6 +7,7 @@ a{color:#e7c55b}
 h1,.gold{color:#e7c55b}
 .center{text-align:center}
 .muted{color:#bbb}
+.warn{color:#ffb020;font-weight:700}
 .choices{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
 .choice{font-size:36px;padding:28px;border:3px solid #777;border-radius:18px;background:#ffffff0d;color:#fff;cursor:pointer}
 .choice.selected{background:#e7c55b33;border-color:#e7c55b;box-shadow:0 0 18px #e7c55b88}
@@ -31,7 +32,6 @@ input,select{padding:10px;border-radius:8px;border:1px solid #777;background:#18
 .team{padding:12px;border-radius:12px;background:#ffffff10;text-align:center;border:1px solid #ffffff30;transition:opacity .6s,filter .6s,transform .6s}
 .team b{display:block;font-size:22px;overflow-wrap:anywhere}
 .team .ans{font-size:20px;font-weight:800;margin:4px 0}
-.team .tm{font-size:14px;font-weight:700;opacity:.9;margin-bottom:4px}
 .team.ok{outline:5px solid #fff;outline-offset:-5px;box-shadow:0 0 22px #ffffffaa;transform:scale(1.04)}
 .team.ng{opacity:.4;filter:saturate(.5)}
 .drop{font-weight:900}

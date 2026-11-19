@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <title>司会</title>
 </head>
 <body>
@@ -20,8 +20,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <script>
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 6) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const $ = s => document.querySelector(s);
 let G = defaults;
 
@@ -35,11 +36,11 @@ function render(g) {
     '<span>' + (g.current ? '第' + g.current + '問 / 全' + n + '問' : '全' + n + '問') + '</span></div>';
   if (g.current && ph !== "lobby" && ph !== "final") {
     h += '<h2>' + esc(g.question) + '</h2>' +
-      '<div class="row" style="justify-content:space-between"><span>確定 <b class="gold">' + countConfirmed(g) + '</b> / ' + SETUP.teams.length +
-      '（選択中 ' + (countVotes(g) - countConfirmed(g)) + '）</span>' +
+      '<div class="row" style="justify-content:space-between"><span>回答済み <b class="gold">' + countConfirmed(g) + '</b> / ' + SETUP.teams.length + '</span>' +
       '<span class="muted">正解（司会用）：' + esc(q?.answer || "未登録") + '　失敗時 ↓' + (q ? q.penalty : 1) + '</span></div><div class="timer" id="tm"></div>';
   }
   if (ph === "final") {
+    // 最終結果になって初めて順位とタイムを表示
     h += '<p class="muted">スクリーンで4位から順に発表されます</p>' + standings(g).filter(x => x.place <= BEST_N)
       .map(x => '<div>' + x.place + '位　' + esc(x.team.name) + '　' + esc(SETUP.ranks[x.ri].name) + '　' + fmtSec(x.ms) + '</div>').join("");
   }

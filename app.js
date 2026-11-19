@@ -3,6 +3,7 @@ const C = window.KAKUZUKE_CONFIG || {};
 firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
+const APP_VERSION = 6;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -68,6 +69,7 @@ function countVotes(g) { return SETUP.teams.filter(t => voteOf(g, g.current, t.i
 function countConfirmed(g) { return SETUP.teams.filter(t => confirmOf(g, g.current, t.id)).length; }
 
 // 回答時間（ミリ秒）：回答開始 → 確定ボタン。確定しなかったチームは締切までの時間
+// ※ 画面に出すのは最終結果発表のときだけ
 function timeMs(g, q, id) {
   const opened = g.opened?.[q];
   if (!opened) return null;
@@ -79,6 +81,10 @@ function timeMs(g, q, id) {
 // 正解発表済みの問題の回答時間の合計
 function totalMs(g, id) {
   return Object.keys(g.answers || {}).reduce((s, q) => s + (timeMs(g, q, id) || 0), 0);
+}
+// 時間が記録されていない問題があるか（古い app.js で進行した場合など）
+function missingTimes(g) {
+  return Object.keys(g.answers || {}).filter(q => !g.opened?.[q] || !g.closed?.[q]);
 }
 const fmtSec = ms => ms == null ? "-" : (ms / 1000).toFixed(2) + "秒";
 

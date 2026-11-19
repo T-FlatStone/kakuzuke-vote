@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -14,8 +14,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <script>
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 6) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
 let G = defaults, busy = false;
 
@@ -36,18 +37,19 @@ function render(g) {
   if (ph === "lobby") {
     h += '<p class="big">まもなく開始します</p>';
   } else if (ph === "final") {
+    // 最終結果発表で初めて回答時間の合計を表示
     h += '<p class="muted center">最終格付け</p><div class="center">' + rankBadge(r, "huge") + '</div>' +
-      '<p class="center muted">回答時間の合計：' + fmtSec(totalMs(g, me.id)) + '</p>';
+      '<p class="center muted">スクリーンの結果発表をご覧ください</p>';
   } else {
     h += '<p class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</p><h2>' + esc(g.question) + '</h2>';
     if (ph === "open") {
       h += '<div class="choices">' + g.choices.map(x =>
         '<button type="button" class="choice' + (mine === x ? ' selected' : '') + '" data-v="' + esc(x) + '"' + (conf ? ' disabled' : '') + '>' + esc(x) + '</button>').join("") + '</div>';
       if (conf) {
-        h += '<div class="done">✔ ' + esc(conf.c) + ' で確定しました<br><small>回答時間 ' + fmtSec(timeMs(g, g.current, me.id)) + '</small></div>';
+        h += '<div class="done">✔ ' + esc(conf.c) + ' で確定しました</div>';
       } else {
         h += '<button type="button" class="confirm" id="confirm"' + (mine ? '' : ' disabled') + '>' + (mine ? esc(mine) + ' で確定する' : '選んでから確定') + '</button>' +
-          '<p class="muted center">確定するまで選び直せます。確定までの時間が順位に影響します</p>';
+          '<p class="muted center">確定するまで選び直せます。確定までの速さも順位に影響します</p>';
       }
       h += '<div class="timer" id="tm" aria-live="off"></div>';
     } else if (ph === "closed") {
@@ -57,8 +59,7 @@ function render(g) {
       const d = dropOf(g, me.id);
       h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' +
         (mine === g.answer ? "⭕ 正解！" : mine ? "❌ 不正解" : "⏰ 未投票") + '</p>' +
-        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>' +
-        '<p class="center muted">回答時間 ' + fmtSec(timeMs(g, g.current, me.id)) + '</p>';
+        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>';
     } else {
       h += '<p class="big">回答開始までお待ちください</p>';
     }
@@ -70,7 +71,7 @@ function render(g) {
     if (phaseOf(G) !== "open" || confirmOf(G, G.current, me.id)) return;
     db.ref("game/votes/" + G.current + "/" + me.id).set(b.dataset.v);
   }));
-  // 確定（ここで時間が止まる。確定後は変更不可）
+  // 確定（ここで時刻を記録。確定後は変更不可）
   const cb = app.querySelector("#confirm");
   if (cb) cb.addEventListener("click", async () => {
     const v = voteOf(G, G.current, me.id);

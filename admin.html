@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <title>管理</title>
 </head>
 <body>
@@ -88,17 +88,17 @@
   </section>
 
   <section class="card">
-    <h2>各チームの状況（順位順）</h2>
-    <p class="muted" style="font-size:13px">上段：今の問題の回答と回答時間　下段：格付けと回答時間の合計</p>
+    <h2 id="teamsTitle">各チームの状況</h2>
+    <p class="muted" style="font-size:13px" id="teamsNote"></p>
     <div class="teams" id="teams"></div>
   </section>
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <script>
-if (typeof standings !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 6) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const $ = s => document.querySelector(s);
 let G = defaults;
 let teamRows = [], rankRows = [], rows = [];
@@ -301,10 +301,12 @@ function renderGame(g) {
   G = g;
   const ph = phaseOf(g);
   const q = SETUP.questions[g.current - 1];
+  const miss = missingTimes(g);
   $("#state").innerHTML = '状態：<b class="gold">' + PHASE_LABEL[ph] + '</b>　' +
-    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　確定 ' + countConfirmed(g) + '/' + SETUP.teams.length +
-      '（選択中 ' + (countVotes(g) - countConfirmed(g)) + '）　登録正解：' + esc(q?.answer || "未登録") + '　失敗時↓' + (q ? q.penalty : 1) : '問題未選択') +
-    '　<span class="timer" id="tm" style="font-size:20px;display:inline"></span>';
+    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　回答済み ' + countConfirmed(g) + '/' + SETUP.teams.length +
+      '　登録正解：' + esc(q?.answer || "未登録") + '　失敗時↓' + (q ? q.penalty : 1) : '問題未選択') +
+    '　<span class="timer" id="tm" style="font-size:20px;display:inline"></span>' +
+    (miss.length ? '<br><span class="warn">⚠ 第' + miss.join("・") + '問の回答時間が記録されていません（司会・管理ページが古い app.js で動いていた可能性があります）</span>' : '');
 
   const jump = $("#jump"), keep = jump.value;
   jump.innerHTML = SETUP.questions.map((qq, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '. ' + esc(qq.text) + '</option>').join("");
@@ -313,13 +315,26 @@ function renderGame(g) {
 
   $("#manualAns").innerHTML = (g.choices || ["A", "B"]).map(L => '<button type="button" class="ctrl sub" data-ans="' + L + '">' + L + '</button>').join("");
 
-  $("#teams").innerHTML = standings(g).map(x => {
-    const t = x.team, r = SETUP.ranks[x.ri];
-    const v = voteOf(g, g.current, t.id), conf = confirmOf(g, g.current, t.id);
-    return '<div class="team" style="' + rankStyle(r) + '"><b>' + x.place + '位 ' + esc(t.name) + '</b>' +
-      '<div class="ans">' + esc(v || "-") + (conf ? ' ✔ ' + fmtSec(timeMs(g, g.current, t.id)) : v ? ' (未確定)' : '') + '</div>' +
-      '<small>' + esc(r.name) + '　計 ' + fmtSec(x.ms) + '</small></div>';
-  }).join("");
+  if (ph === "final") {
+    // 最終結果になったら順位順＋回答時間の合計を表示
+    $("#teamsTitle").textContent = "最終順位";
+    $("#teamsNote").textContent = "格付けが上ほど上位、同じ格付けなら回答時間の合計が短いほど上位";
+    $("#teams").innerHTML = standings(g).map(x => {
+      const r = SETUP.ranks[x.ri];
+      return '<div class="team" style="' + rankStyle(r) + '"><b>' + x.place + '位 ' + esc(x.team.name) + '</b>' +
+        '<div class="ans">' + esc(r.name) + '</div><small>合計 ' + fmtSec(x.ms) + '</small></div>';
+    }).join("");
+  } else {
+    // 本番中は順位・時間を出さない（チーム順で今の回答状況だけ）
+    $("#teamsTitle").textContent = "各チームの状況";
+    $("#teamsNote").textContent = "順位と回答時間は最終結果発表まで表示しません";
+    $("#teams").innerHTML = SETUP.teams.map(t => {
+      const r = rankOf(g, t.id);
+      const v = voteOf(g, g.current, t.id), conf = confirmOf(g, g.current, t.id);
+      return '<div class="team" style="' + rankStyle(r) + '"><b>' + esc(t.name) + '</b>' +
+        '<div class="ans">' + esc(v || "-") + (conf ? ' ✔' : v ? ' (未確定)' : '') + '</div><small>' + esc(r.name) + '</small></div>';
+    }).join("");
+  }
 }
 function tick(g) {
   autoClose(g);

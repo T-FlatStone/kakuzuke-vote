@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <title>格付けチェック スクリーン</title>
 </head>
 <body>
@@ -15,8 +15,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <script>
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 6) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;   // 最終結果のアニメーションを1回だけ再生するため
 
 function render(g) {
@@ -34,9 +35,9 @@ function render(g) {
     return;
   }
 
-  // 最終結果：ベスト4（4位→1位の順に登場）＋ランク別一覧
+  // 最終結果：ここで初めて順位と回答時間の合計を表示（4位→1位の順に登場）
   if (ph === "final") {
-    if (finalShown) return;          // 途中で再描画してアニメーションが最初からにならないように
+    if (finalShown) return;
     finalShown = true;
     const best = standings(g).filter(x => x.place <= BEST_N);
     const maxPlace = Math.max(...best.map(x => x.place), 1);
@@ -53,11 +54,11 @@ function render(g) {
     return;
   }
 
-  // 問題表示〜正解発表
+  // 問題表示〜正解発表（回答時間は出さない）
   let status;
   if (ph === "answer") status = '<div class="big gold">正解は ' + esc(g.answer) + '！</div>';
   else if (ph === "closed") status = '<div class="big">締切！</div>';
-  else if (ph === "open") status = '<div class="big">' + countConfirmed(g) + ' / ' + SETUP.teams.length + ' チーム確定</div><div class="timer huge" id="tm"></div>';
+  else if (ph === "open") status = '<div class="big">' + countConfirmed(g) + ' / ' + SETUP.teams.length + ' チーム回答済み</div><div class="timer huge" id="tm"></div>';
   else status = '<div class="big" style="font-size:32px">まもなく回答開始</div>';
 
   head.innerHTML = '<div class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</div>' +
@@ -67,24 +68,20 @@ function render(g) {
     const v = voteOf(g, g.current, t.id);
     const conf = confirmOf(g, g.current, t.id);
     const r = rankOf(g, t.id);
-    const tm = timeMs(g, g.current, t.id);
-    const tmTxt = '<div class="tm">⏱ ' + (conf ? fmtSec(tm) : v ? '未確定' : '-') + '</div>';
-    let cls = "team", txt, style, extra = "";
+    let cls = "team", txt, style;
     if (ph === "answer") {
       const ok = v === g.answer, d = dropOf(g, t.id);
       cls += ok ? " ok" : " ng";
       txt = (v ? esc(v) + " " + (ok ? "⭕" : "❌") : "未投票 ❌") + (d > 0 ? ' <span class="drop">↓' + d + '</span>' : '');
       style = choiceStyle(v);
-      extra = tmTxt;
     } else if (ph === "closed") {
       txt = v ? "回答：" + esc(v) : "未投票";          // 締切の瞬間に回答を公開
       style = choiceStyle(v);                         // A赤 / B青 / C黄 / D緑 / 未投票グレー
-      extra = tmTxt;
     } else {
-      txt = conf ? "✔ 確定" : v ? "選択中…" : "待機中";  // 受付中は中身を隠す
+      txt = conf ? "✔ 回答済み" : "待機中";            // 確定するまでは「待機中」
       style = rankStyle(r);
     }
-    return '<div class="' + cls + '" style="' + style + '"><b>' + esc(t.name) + '</b><div class="ans">' + txt + '</div>' + extra + rankBadge(r) + '</div>';
+    return '<div class="' + cls + '" style="' + style + '"><b>' + esc(t.name) + '</b><div class="ans">' + txt + '</div>' + rankBadge(r) + '</div>';
   }).join("") + '</div>';
 }
 
