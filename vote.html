@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -14,10 +14,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
 const app = document.querySelector("#app");
-let G = defaults;
+let G = defaults, busy = false;
 
 function render(g) {
   G = g;
@@ -28,36 +28,61 @@ function render(g) {
     return;
   }
   const ph = phaseOf(g);
-  const mine = g.votes?.[g.current]?.[me.id] || "";
+  const mine = voteOf(g, g.current, me.id);
+  const conf = confirmOf(g, g.current, me.id);
   const r = rankOf(g, me.id);
   let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(me.name) + '</h2>' + rankBadge(r) + '</div>';
 
   if (ph === "lobby") {
     h += '<p class="big">まもなく開始します</p>';
   } else if (ph === "final") {
-    h += '<p class="muted center">最終格付け</p><div class="center">' + rankBadge(r, "huge") + '</div>';
+    h += '<p class="muted center">最終格付け</p><div class="center">' + rankBadge(r, "huge") + '</div>' +
+      '<p class="center muted">回答時間の合計：' + fmtSec(totalMs(g, me.id)) + '</p>';
   } else {
     h += '<p class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</p><h2>' + esc(g.question) + '</h2>';
     if (ph === "open") {
       h += '<div class="choices">' + g.choices.map(x =>
-        '<button type="button" class="choice' + (mine === x ? ' selected' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>' +
-        '<div class="timer" id="tm" aria-live="off"></div><p class="muted center">締切まで回答を変更できます</p>';
+        '<button type="button" class="choice' + (mine === x ? ' selected' : '') + '" data-v="' + esc(x) + '"' + (conf ? ' disabled' : '') + '>' + esc(x) + '</button>').join("") + '</div>';
+      if (conf) {
+        h += '<div class="done">✔ ' + esc(conf.c) + ' で確定しました<br><small>回答時間 ' + fmtSec(timeMs(g, g.current, me.id)) + '</small></div>';
+      } else {
+        h += '<button type="button" class="confirm" id="confirm"' + (mine ? '' : ' disabled') + '>' + (mine ? esc(mine) + ' で確定する' : '選んでから確定') + '</button>' +
+          '<p class="muted center">確定するまで選び直せます。確定までの時間が順位に影響します</p>';
+      }
+      h += '<div class="timer" id="tm" aria-live="off"></div>';
     } else if (ph === "closed") {
-      h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b></p>';
+      h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b>' +
+        (mine && !conf ? '（未確定）' : '') + '</p>';
     } else if (ph === "answer") {
       const d = dropOf(g, me.id);
       h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' +
         (mine === g.answer ? "⭕ 正解！" : mine ? "❌ 不正解" : "⏰ 未投票") + '</p>' +
-        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>';
+        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>' +
+        '<p class="center muted">回答時間 ' + fmtSec(timeMs(g, g.current, me.id)) + '</p>';
     } else {
       h += '<p class="big">回答開始までお待ちください</p>';
     }
   }
   app.innerHTML = h;
+
+  // 選択（確定前なら何度でも変更可）
   app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
-    if (phaseOf(G) !== "open") return;
+    if (phaseOf(G) !== "open" || confirmOf(G, G.current, me.id)) return;
     db.ref("game/votes/" + G.current + "/" + me.id).set(b.dataset.v);
   }));
+  // 確定（ここで時間が止まる。確定後は変更不可）
+  const cb = app.querySelector("#confirm");
+  if (cb) cb.addEventListener("click", async () => {
+    const v = voteOf(G, G.current, me.id);
+    if (busy || !v || phaseOf(G) !== "open" || confirmOf(G, G.current, me.id)) return;
+    if (!confirm(v + " で確定しますか？\n確定すると変更できません。")) return;
+    busy = true; cb.disabled = true;
+    try {
+      await db.ref("game/confirms/" + G.current + "/" + me.id).set({ c: v, at: TS });
+    } catch (e) {
+      alert("確定できませんでした。もう一度押してください。");
+    } finally { busy = false; }
+  });
 }
 
 function tick(g) {

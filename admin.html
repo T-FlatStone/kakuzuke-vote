@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <title>管理</title>
 </head>
 <body>
@@ -11,7 +11,6 @@
   <h1>管理ページ</h1>
   <p class="muted"><a href="host.html" target="_blank" rel="noopener">司会ページ</a>　/　<a href="screen.html" target="_blank" rel="noopener">スクリーン</a></p>
 
-  <!-- ============ 基本設定 ============ -->
   <section class="card">
     <h2>基本設定</h2>
     <div class="row">
@@ -20,7 +19,6 @@
     </div>
   </section>
 
-  <!-- ============ チーム ============ -->
   <section class="card">
     <h2>チーム</h2>
     <div class="row">
@@ -35,7 +33,6 @@
     <p class="muted" style="font-size:13px">IDは投票URLの <code>?team=</code> に使う固定の記号です。チーム名を変えてもURLは変わりません。<br>チーム数を減らすと、末尾のチームから削除されます。</p>
   </section>
 
-  <!-- ============ ランク ============ -->
   <section class="card">
     <h2>ランク（上から順に格下げ）</h2>
     <div class="tablewrap"><table>
@@ -48,7 +45,6 @@
     </div>
   </section>
 
-  <!-- ============ 問題 ============ -->
   <section class="card">
     <h2>問題と正解</h2>
     <div class="tablewrap"><table>
@@ -61,7 +57,6 @@
     <p class="muted" style="font-size:13px">「失敗時↓」は、不正解・未投票だったチームが下がるランク数です（0〜10、初期値1）。<br>本番中に問題の順番を入れ替えると、過去の回答との対応がずれるので注意してください。</p>
   </section>
 
-  <!-- ============ 保存バー ============ -->
   <div class="savebar row">
     <button type="button" class="ctrl" id="saveSetup">保存</button>
     <span id="dirty" class="dirty" aria-live="polite"></span>
@@ -71,7 +66,6 @@
     <button type="button" class="ctrl sub" id="reload">保存済みに戻す</button>
   </div>
 
-  <!-- ============ 進行（手動操作） ============ -->
   <section class="card">
     <h2>進行（手動操作）</h2>
     <div id="state" aria-live="polite"></div>
@@ -93,21 +87,21 @@
     </div>
   </section>
 
-  <!-- ============ 状況 ============ -->
   <section class="card">
-    <h2>各チームの状況</h2>
+    <h2>各チームの状況（順位順）</h2>
+    <p class="muted" style="font-size:13px">上段：今の問題の回答と回答時間　下段：格付けと回答時間の合計</p>
     <div class="teams" id="teams"></div>
   </section>
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
-if (typeof watchAll !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
+if (typeof standings !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
 const $ = s => document.querySelector(s);
 let G = defaults;
-let teamRows = [], rankRows = [], rows = [];   // 編集中の内容
+let teamRows = [], rankRows = [], rows = [];
 let dirty = false;
 
 function setDirty(v) { dirty = v; $("#dirty").textContent = v ? "未保存の変更があります" : ""; }
@@ -123,7 +117,7 @@ function renderTeams() {
 }
 $("#teamCount").addEventListener("change", () => {
   const n = clampInt($("#teamCount").value, 1, MAX_TEAMS, teamRows.length || 1);
-  if (n === teamRows.length) { $("#teamCount").value = n; return; }   // 変化なしなら再描画しない
+  if (n === teamRows.length) { $("#teamCount").value = n; return; }
   if (n < teamRows.length) {
     const removed = teamRows.slice(n).map(t => t.name).join("、");
     if (!confirm("次のチームを削除します：\n" + removed)) { renderTeams(); return; }
@@ -161,7 +155,6 @@ $("#rrows").addEventListener("input", e => {
   if (!tr || !f) return;
   const r = rankRows[+tr.dataset.i];
   r[f] = e.target.value;
-  // 見本だけ更新（再描画するとカラーピッカーが閉じるため）
   tr.querySelector(".badge").outerHTML = rankBadge(r);
   setDirty(true);
 });
@@ -306,11 +299,11 @@ window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); 
 // ---------- 進行 ----------
 function renderGame(g) {
   G = g;
-  const ph = phaseOf(g), vs = g.votes?.[g.current] || {};
+  const ph = phaseOf(g);
   const q = SETUP.questions[g.current - 1];
   $("#state").innerHTML = '状態：<b class="gold">' + PHASE_LABEL[ph] + '</b>　' +
-    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　回答 ' + countVotes(g) + '/' + SETUP.teams.length +
-      '　登録正解：' + esc(q?.answer || "未登録") + '　失敗時↓' + (q ? q.penalty : 1) : '問題未選択') +
+    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　確定 ' + countConfirmed(g) + '/' + SETUP.teams.length +
+      '（選択中 ' + (countVotes(g) - countConfirmed(g)) + '）　登録正解：' + esc(q?.answer || "未登録") + '　失敗時↓' + (q ? q.penalty : 1) : '問題未選択') +
     '　<span class="timer" id="tm" style="font-size:20px;display:inline"></span>';
 
   const jump = $("#jump"), keep = jump.value;
@@ -320,10 +313,12 @@ function renderGame(g) {
 
   $("#manualAns").innerHTML = (g.choices || ["A", "B"]).map(L => '<button type="button" class="ctrl sub" data-ans="' + L + '">' + L + '</button>').join("");
 
-  $("#teams").innerHTML = SETUP.teams.map(t => {
-    const r = rankOf(g, t.id);
-    return '<div class="team" style="' + rankStyle(r) + '"><b>' + esc(t.name) + '</b><div class="ans">' + esc(vs[t.id] || "-") +
-      '</div><small>' + esc(r.name) + '</small></div>';
+  $("#teams").innerHTML = standings(g).map(x => {
+    const t = x.team, r = SETUP.ranks[x.ri];
+    const v = voteOf(g, g.current, t.id), conf = confirmOf(g, g.current, t.id);
+    return '<div class="team" style="' + rankStyle(r) + '"><b>' + x.place + '位 ' + esc(t.name) + '</b>' +
+      '<div class="ans">' + esc(v || "-") + (conf ? ' ✔ ' + fmtSec(timeMs(g, g.current, t.id)) : v ? ' (未確定)' : '') + '</div>' +
+      '<small>' + esc(r.name) + '　計 ' + fmtSec(x.ms) + '</small></div>';
   }).join("");
 }
 function tick(g) {
@@ -335,8 +330,8 @@ function tick(g) {
 }
 
 $("#bGoto").addEventListener("click", () => Ops.goto(parseInt($("#jump").value, 10)));
-$("#bOpen").addEventListener("click", () => { if (!G.current) return alert("先に問題を表示してください"); Ops.start(); });
-$("#bClose").addEventListener("click", () => Ops.close());
+$("#bOpen").addEventListener("click", () => { if (!G.current) return alert("先に問題を表示してください"); Ops.start(G); });
+$("#bClose").addEventListener("click", () => { if (G.current) Ops.close(G); });
 $("#bReveal").addEventListener("click", () => { if (G.current) Ops.reveal(G); });
 $("#manualAns").addEventListener("click", e => {
   const b = e.target.closest("button[data-ans]");
@@ -344,8 +339,8 @@ $("#manualAns").addEventListener("click", e => {
 });
 $("#bLobby").addEventListener("click", () => Ops.lobby());
 $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
-$("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答と正解を消して、やり直しますか？")) Ops.redo(G); });
-$("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付けを消去して最初に戻します。よろしいですか？\n（登録した問題・チーム・ランクは消えません）")) Ops.resetAll(G); });
+$("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答・確定・正解を消して、やり直しますか？")) Ops.redo(G); });
+$("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付け・回答時間を消去して最初に戻します。よろしいですか？\n（登録した問題・チーム・ランクは消えません）")) Ops.resetAll(G); });
 
 loadSetup();
 watchAll(renderGame, tick);

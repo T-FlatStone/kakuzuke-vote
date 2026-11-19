@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <title>司会</title>
 </head>
 <body>
@@ -20,7 +20,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
 const $ = s => document.querySelector(s);
 let G = defaults;
@@ -35,20 +35,20 @@ function render(g) {
     '<span>' + (g.current ? '第' + g.current + '問 / 全' + n + '問' : '全' + n + '問') + '</span></div>';
   if (g.current && ph !== "lobby" && ph !== "final") {
     h += '<h2>' + esc(g.question) + '</h2>' +
-      '<div class="row" style="justify-content:space-between"><span>回答 <b class="gold">' + countVotes(g) + '</b> / ' + SETUP.teams.length + '</span>' +
+      '<div class="row" style="justify-content:space-between"><span>確定 <b class="gold">' + countConfirmed(g) + '</b> / ' + SETUP.teams.length +
+      '（選択中 ' + (countVotes(g) - countConfirmed(g)) + '）</span>' +
       '<span class="muted">正解（司会用）：' + esc(q?.answer || "未登録") + '　失敗時 ↓' + (q ? q.penalty : 1) + '</span></div><div class="timer" id="tm"></div>';
+  }
+  if (ph === "final") {
+    h += '<p class="muted">スクリーンで4位から順に発表されます</p>' + standings(g).filter(x => x.place <= BEST_N)
+      .map(x => '<div>' + x.place + '位　' + esc(x.team.name) + '　' + esc(SETUP.ranks[x.ri].name) + '　' + fmtSec(x.ms) + '</div>').join("");
   }
   $("#info").innerHTML = h;
 
-  // ① 回答開始（制限時間なしの場合は受付中に「締め切る」へ変わる）
   const manualClose = ph === "open" && !g.deadline;
   $("#bStart").textContent = manualClose ? "締め切る" : "回答開始";
   $("#bStart").disabled = !(ph === "ready" || manualClose);
-
-  // ② 正解発表
   $("#bAnswer").disabled = ph !== "closed";
-
-  // ③ 次の問題へ（最後の問題のあとは最終結果）
   const isLast = g.current >= n && n > 0;
   $("#bNext").textContent = g.current === 0 ? "第1問へ" : isLast ? "最終結果発表" : "次の問題へ";
   $("#bNext").disabled = n === 0 || !(ph === "lobby" || ph === "answer");
@@ -66,7 +66,7 @@ function tick(g) {
 }
 
 $("#bStart").addEventListener("click", () => {
-  if (phaseOf(G) === "open") Ops.close(); else Ops.start();
+  if (phaseOf(G) === "open") Ops.close(G); else Ops.start(G);
 });
 $("#bAnswer").addEventListener("click", () => {
   const ans = SETUP.questions[G.current - 1]?.answer;
