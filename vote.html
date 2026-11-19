@@ -1,25 +1,70 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>格付けチェック 投票</title></head><body><main class="wrap"><h1>格付けチェック 投票</h1><div id="app" class="card">読込中...</div></main>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<title>格付けチェック 投票</title>
+</head>
+<body>
+<main class="wrap">
+  <h1 id="title">格付けチェック</h1>
+  <div id="app" class="card">読込中...</div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 <script>
-let cur = 1;
 const app = document.querySelector("#app");
-if (!C.teams.includes(team)) {
-  app.innerHTML = "<b>チーム指定が不正です。</b><p>URLの末尾に ?team=A ～ ?team=P を付けて開いてください。</p>";
-} else {
-  db.ref("game").on("value", s => {
-    const g = { ...defaults, ...s.val() }; cur = g.current;
-    const mine = g.votes?.[g.current]?.[team] || "";
-    const rank = C.ranks[calcRank(g.votes, g.answers, team)];
-    let h = '<h2>チーム ' + team + ' <span class="gold">（' + esc(rank) + '）</span></h2><p class="muted">第' + g.current + '問</p><h2>' + esc(g.question) + '</h2>';
-    if (g.phase === "open") {
-      h += '<div class="choices">' + g.choices.map(x => '<button type="button" class="choice ' + (mine === x ? "selected" : "") + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div><p class="muted">締切まで回答を変更できます</p>';
-    } else if (g.phase === "answer") {
-      h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' + (mine ? (mine === g.answer ? "⭕ 正解！" : "❌ 不正解") : "未投票") + '</p>';
+let G = defaults;
+
+function render(g) {
+  G = g;
+  const ph = phaseOf(g);
+  document.querySelector("#title").textContent = g.title;
+  const mine = g.votes?.[g.current]?.[team] || "";
+  const rank = C.ranks[calcRank(g.votes, g.answers, team)];
+  let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">チーム ' + team + '</h2><span class="gold">' + esc(rank) + '</span></div>';
+
+  if (ph === "lobby") {
+    h += '<p class="big">まもなく開始します</p>';
+  } else if (ph === "final") {
+    h += '<p class="muted center">最終格付け</p><div class="big gold">' + esc(rank) + '</div>';
+  } else {
+    h += '<p class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</p><h2>' + esc(g.question) + '</h2>';
+    if (ph === "open") {
+      h += '<div class="choices">' + g.choices.map(x =>
+        '<button type="button" class="choice' + (mine === x ? ' selected' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>' +
+        '<div class="timer" id="tm" aria-live="off"></div><p class="muted center">締切まで回答を変更できます</p>';
+    } else if (ph === "closed") {
+      h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b></p>';
+    } else if (ph === "answer") {
+      h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' +
+        (mine ? (mine === g.answer ? "⭕ 正解！" : "❌ 不正解") : "未投票") + '</p>';
     } else {
-      h += '<p class="big">' + (g.phase === "closed" ? "投票締切" : "投票開始までお待ちください") + '</p>';
+      h += '<p class="big">回答開始までお待ちください</p>';
     }
-    app.innerHTML = h;
-    app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => db.ref("game/votes/" + cur + "/" + team).set(b.dataset.v)));
-  });
+  }
+  app.innerHTML = h;
+  app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
+    if (phaseOf(G) !== "open") return;
+    db.ref("game/votes/" + G.current + "/" + team).set(b.dataset.v);
+  }));
 }
-</script></body></html>
+
+function tick(g) {
+  const el = document.querySelector("#tm");
+  if (!el) return;
+  const r = remainingSec(g);
+  el.textContent = r == null ? "" : "残り " + r + " 秒";
+}
+
+if (!C.teams.includes(team)) {
+  app.innerHTML = "<b>チーム指定が不正です。</b><p>URLの末尾に ?team=A ～ ?team=" + C.teams[C.teams.length - 1] + " を付けて開いてください。</p>";
+} else {
+  watchGame(render, tick);
+}
+</script>
+</body>
+</html>

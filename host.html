@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<title>司会</title>
+</head>
+<body>
+<main class="wrap" style="max-width:640px">
+  <h1>司会</h1>
+  <div class="card" id="info" aria-live="polite">読込中...</div>
+  <div class="hostbtns">
+    <button type="button" class="hostbtn" id="bStart">回答開始</button>
+    <button type="button" class="hostbtn alt" id="bAnswer">正解発表</button>
+    <button type="button" class="hostbtn next" id="bNext">次の問題へ</button>
+  </div>
+  <p class="muted center" id="hint"></p>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+let G = defaults;
+
+function render(g) {
+  G = g;
+  const ph = phaseOf(g);
+  const n = SETUP.questions.length;
+  const vs = g.votes?.[g.current] || {};
+  const q = SETUP.questions[g.current - 1];
+
+  let h = '<div class="row" style="justify-content:space-between"><b class="gold">' + PHASE_LABEL[ph] + '</b>' +
+    '<span>' + (g.current ? '第' + g.current + '問 / 全' + n + '問' : '全' + n + '問') + '</span></div>';
+  if (g.current && ph !== "lobby" && ph !== "final") {
+    h += '<h2>' + esc(g.question) + '</h2>' +
+      '<div class="row" style="justify-content:space-between"><span>回答 <b class="gold">' + Object.keys(vs).length + '</b> / ' + C.teams.length + '</span>' +
+      '<span class="muted">正解（司会用）：' + esc(q?.answer || "未登録") + '</span></div><div class="timer" id="tm"></div>';
+  }
+  $("#info").innerHTML = h;
+
+  // ① 回答開始（制限時間なしの場合は受付中に「締め切る」へ変わる）
+  const manualClose = ph === "open" && !g.deadline;
+  $("#bStart").textContent = manualClose ? "締め切る" : "回答開始";
+  $("#bStart").disabled = !(ph === "ready" || manualClose);
+
+  // ② 正解発表
+  $("#bAnswer").disabled = ph !== "closed";
+
+  // ③ 次の問題へ（最後の問題のあとは最終結果）
+  const isLast = g.current >= n && n > 0;
+  $("#bNext").textContent = g.current === 0 ? "第1問へ" : isLast ? "最終結果発表" : "次の問題へ";
+  $("#bNext").disabled = n === 0 || !(ph === "lobby" || ph === "answer");
+
+  $("#hint").textContent = n === 0 ? "問題が登録されていません。管理ページで登録してください。"
+    : SETUP.timerSec > 0 ? "制限時間 " + SETUP.timerSec + " 秒（時間になると自動で締切）" : "制限時間なし（「締め切る」で手動締切）";
+}
+
+function tick(g) {
+  autoClose(g);
+  const el = $("#tm");
+  if (!el) return;
+  const r = remainingSec(g);
+  el.textContent = r == null ? "" : "残り " + r + " 秒";
+}
+
+$("#bStart").addEventListener("click", () => {
+  if (phaseOf(G) === "open") Ops.close(); else Ops.start();
+});
+$("#bAnswer").addEventListener("click", () => {
+  const ans = SETUP.questions[G.current - 1]?.answer;
+  if (ans && !confirm("正解「" + ans + "」を発表しますか？")) return;
+  Ops.reveal(G);
+});
+$("#bNext").addEventListener("click", () => {
+  if (G.current >= SETUP.questions.length) {
+    if (confirm("最終結果を発表しますか？")) Ops.final();
+  } else {
+    Ops.goto(G.current + 1);
+  }
+});
+
+watchSetup(() => render(G));
+watchGame(render, tick);
+</script>
+</body>
+</html>

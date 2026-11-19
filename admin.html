@@ -1,31 +1,216 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>司会コントロール</title></head><body><main class="wrap"><h1>司会コントロール</h1>
-<div class="card row"><label>問題番号 <input id="num" type="number" min="1" value="1" style="width:90px"></label><input id="question" style="flex:1;min-width:220px" value="高級品はどっち？"><button type="button" class="ctrl" id="prepare">問題を表示</button></div>
-<div class="card row"><button type="button" class="ctrl" id="open">投票開始</button><button type="button" class="ctrl sub" id="close">締切</button><button type="button" class="ctrl" data-ans="A">A が正解</button><button type="button" class="ctrl" data-ans="B">B が正解</button><button type="button" class="ctrl sub" id="next">次の問題</button><button type="button" class="ctrl sub" id="reset">全リセット</button></div>
-<div id="status" class="card"></div></main>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script><script src="config.js"></script><script src="app.js"></script>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<title>管理</title>
+</head>
+<body>
+<main class="wrap">
+  <h1>管理ページ</h1>
+  <p class="muted"><a class="gold" href="host.html" target="_blank" rel="noopener">司会ページ</a>　/　<a class="gold" href="screen.html" target="_blank" rel="noopener">スクリーン</a></p>
+
+  <!-- ============ 事前設定 ============ -->
+  <section class="card">
+    <h2>事前設定</h2>
+    <div class="row">
+      <label>タイトル <input id="title" type="text" maxlength="40" style="width:280px"></label>
+      <label>制限時間 <input id="timer" type="number" min="0" max="600" style="width:90px"> 秒（0 = 無制限）</label>
+    </div>
+
+    <h3>問題と正解</h3>
+    <table>
+      <thead><tr><th>#</th><th>問題文</th><th>選択肢</th><th>正解</th><th></th></tr></thead>
+      <tbody id="qrows"></tbody>
+    </table>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl sub" id="addQ">＋ 問題を追加</button>
+      <button type="button" class="ctrl" id="saveSetup">保存</button>
+      <span id="dirty" class="dirty" aria-live="polite"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl sub" id="exportJ">JSONに書き出し</button>
+      <label class="ctrl sub" style="padding:10px 14px;border-radius:10px;background:#444;cursor:pointer">JSONから読込<input id="importJ" type="file" accept=".json,application/json" hidden></label>
+      <button type="button" class="ctrl sub" id="reload">保存済みの内容に戻す</button>
+    </div>
+    <p class="muted" style="font-size:13px">問題と正解はFirebaseに保存されます（GitHubには入りません）。JSON書き出しは手元バックアップ用です。<br>本番中に問題の順番を入れ替えると、過去の回答との対応がずれるので注意してください。</p>
+  </section>
+
+  <!-- ============ 進行（手動操作） ============ -->
+  <section class="card">
+    <h2>進行（手動操作）</h2>
+    <div id="state" aria-live="polite"></div>
+    <div class="row" style="margin-top:10px">
+      <label>問題 <select id="jump"></select></label>
+      <button type="button" class="ctrl" id="bGoto">この問題を表示</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl" id="bOpen">回答開始</button>
+      <button type="button" class="ctrl sub" id="bClose">締切</button>
+      <button type="button" class="ctrl" id="bReveal">正解発表（登録済み）</button>
+      <span class="muted">手動：</span><span id="manualAns"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl sub" id="bLobby">タイトル画面</button>
+      <button type="button" class="ctrl sub" id="bFinal">最終結果発表</button>
+      <button type="button" class="ctrl danger" id="bRedo">この問題をやり直す</button>
+      <button type="button" class="ctrl danger" id="bReset">全リセット</button>
+    </div>
+  </section>
+
+  <!-- ============ 状況 ============ -->
+  <section class="card">
+    <h2>各チームの状況</h2>
+    <div class="teams" id="teams"></div>
+  </section>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-let g = defaults, editing = false;
-$("#question").addEventListener("focus", () => editing = true);
-$("#question").addEventListener("blur", () => editing = false);
-function prepare(n) {
-  n = Math.max(1, parseInt(n, 10) || 1);
-  db.ref("game").update({ current: n, question: $("#question").value.trim() || "問題", choices: ["A","B"], phase: "ready", answer: null });
+let G = defaults;
+let rows = [];         // 編集中の問題 [{text, n, answer}]
+let dirty = false;
+
+// ---------- 事前設定（エディタ） ----------
+function setDirty(v) { dirty = v; $("#dirty").textContent = v ? "未保存の変更があります" : ""; }
+
+function renderRows() {
+  $("#qrows").innerHTML = rows.map((q, i) => {
+    const n = clampN(q.n);
+    const nSel = [2, 3, 4].map(k => '<option value="' + k + '"' + (k === n ? ' selected' : '') + '>' + LETTERS.slice(0, k).join("/") + '</option>').join("");
+    const aSel = '<option value="">--</option>' + LETTERS.slice(0, n).map(L => '<option' + (q.answer === L ? ' selected' : '') + '>' + L + '</option>').join("");
+    return '<tr data-i="' + i + '"><td>' + (i + 1) + '</td>' +
+      '<td><input type="text" data-f="text" maxlength="80" value="' + esc(q.text) + '" aria-label="第' + (i + 1) + '問の問題文"></td>' +
+      '<td><select data-f="n" aria-label="選択肢">' + nSel + '</select></td>' +
+      '<td><select data-f="answer" aria-label="正解">' + aSel + '</select></td>' +
+      '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up" aria-label="上へ">↑</button>' +
+      '<button type="button" class="ctrl sub" data-act="down" aria-label="下へ">↓</button>' +
+      '<button type="button" class="ctrl danger" data-act="del" aria-label="削除">✕</button></td></tr>';
+  }).join("") || '<tr><td colspan="5" class="muted">問題がありません。「＋ 問題を追加」で追加してください。</td></tr>';
 }
-$("#prepare").addEventListener("click", () => prepare($("#num").value));
-$("#next").addEventListener("click", () => prepare(g.current + 1));
-$("#open").addEventListener("click", () => db.ref("game/phase").set("open"));
-$("#close").addEventListener("click", () => db.ref("game/phase").set("closed"));
-document.querySelectorAll("[data-ans]").forEach(b => b.addEventListener("click", () => {
-  const x = b.dataset.ans;
-  if (!confirm(x + " を正解として発表しますか？")) return;
-  db.ref("game").update({ phase: "answer", answer: x, ["answers/" + g.current]: x });
-}));
-$("#reset").addEventListener("click", () => { if (confirm("投票・正解・格付けをすべて消去しますか？")) db.ref("game").set(defaults); });
-db.ref("game").on("value", s => {
-  g = { ...defaults, ...s.val() }; const vs = g.votes?.[g.current] || {};
-  $("#num").value = g.current; if (!editing) $("#question").value = g.question;
-  $("#status").innerHTML = "現在: 第" + g.current + "問 / " + esc(g.phase) + " / " + Object.keys(vs).length + "チーム回答<br>" +
-    C.teams.map(t => t + ":" + (vs[t] || "-") + "（" + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + "）").join("　");
+
+$("#qrows").addEventListener("input", e => {
+  const tr = e.target.closest("tr"), f = e.target.dataset.f;
+  if (!tr || !f) return;
+  const q = rows[+tr.dataset.i];
+  if (f === "n") {
+    q.n = clampN(e.target.value);
+    if (q.answer && LETTERS.indexOf(q.answer) >= q.n) q.answer = "";
+    renderRows();
+  } else {
+    q[f] = e.target.value;
+  }
+  setDirty(true);
 });
-</script></body></html>
+$("#qrows").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const i = +b.closest("tr").dataset.i, a = b.dataset.act;
+  if (a === "del" && !confirm("第" + (i + 1) + "問を削除しますか？")) return;
+  if (a === "del") rows.splice(i, 1);
+  if (a === "up" && i > 0) [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]];
+  if (a === "down" && i < rows.length - 1) [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]];
+  renderRows(); setDirty(true);
+});
+$("#addQ").addEventListener("click", () => {
+  rows.push({ text: "", n: 2, answer: "" });
+  renderRows(); setDirty(true);
+  const inputs = document.querySelectorAll('#qrows input[data-f="text"]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+$("#title").addEventListener("input", () => setDirty(true));
+$("#timer").addEventListener("input", () => setDirty(true));
+
+$("#saveSetup").addEventListener("click", async () => {
+  const clean = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "" }));
+  const bad = clean.findIndex(q => !q.text || !q.answer);
+  if (bad >= 0) { alert("第" + (bad + 1) + "問の問題文または正解が未入力です"); return; }
+  const timerSec = Math.min(600, Math.max(0, parseInt($("#timer").value, 10) || 0));
+  $("#timer").value = timerSec;
+  await db.ref("setup").set({ questions: clean, timerSec });
+  await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: clean.length });
+  rows = clean; renderRows(); setDirty(false);
+});
+
+async function loadSetup() {
+  const [s, t] = await Promise.all([db.ref("setup").once("value"), db.ref("game/title").once("value")]);
+  const v = s.val() || {};
+  rows = toArr(v.questions).map(q => ({ text: q.text || "", n: clampN(q.n), answer: q.answer || "" }));
+  $("#timer").value = Math.max(0, parseInt(v.timerSec, 10) || 0);
+  $("#title").value = t.val() || defaults.title;
+  renderRows(); setDirty(false);
+}
+$("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中の内容を破棄しますか？")) loadSetup(); });
+
+$("#exportJ").addEventListener("click", () => {
+  const data = { title: $("#title").value, timerSec: +$("#timer").value || 0, questions: rows };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  a.download = "kakuzuke_questions.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("#importJ").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    rows = toArr(d.questions).map(q => ({ text: String(q.text || ""), n: clampN(q.n), answer: LETTERS.includes(q.answer) ? q.answer : "" }));
+    if (d.title) $("#title").value = d.title;
+    if (d.timerSec != null) $("#timer").value = Math.max(0, parseInt(d.timerSec, 10) || 0);
+    renderRows(); setDirty(true);
+    alert("読み込みました。「保存」を押すと反映されます。");
+  } catch (err) { alert("JSONの読み込みに失敗しました"); }
+});
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------- 進行 ----------
+function renderGame(g) {
+  G = g;
+  const ph = phaseOf(g), vs = g.votes?.[g.current] || {};
+  const q = SETUP.questions[g.current - 1];
+  $("#state").innerHTML = '状態：<b class="gold">' + PHASE_LABEL[ph] + '</b>　' +
+    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　回答 ' + Object.keys(vs).length + '/' + C.teams.length + '　登録正解：' + esc(q?.answer || "未登録") : '問題未選択') +
+    '　<span class="timer" id="tm" style="font-size:20px;display:inline"></span>';
+
+  const jump = $("#jump"), keep = jump.value;
+  jump.innerHTML = SETUP.questions.map((qq, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '. ' + esc(qq.text) + '</option>').join("");
+  jump.value = keep || String(Math.min(g.current + 1, SETUP.questions.length) || 1);
+
+  $("#manualAns").innerHTML = (g.choices || ["A", "B"]).map(L => '<button type="button" class="ctrl sub" data-ans="' + L + '">' + L + '</button>').join("");
+
+  $("#teams").innerHTML = C.teams.map(t => '<div class="team"><b>' + t + '</b><br>' + esc(vs[t] || "-") +
+    '<br><small>' + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + '</small></div>').join("");
+}
+function tick(g) {
+  autoClose(g);
+  const el = $("#tm");
+  if (!el) return;
+  const r = remainingSec(g);
+  el.textContent = r == null ? "" : "残り " + r + " 秒";
+}
+
+$("#bGoto").addEventListener("click", () => Ops.goto(parseInt($("#jump").value, 10)));
+$("#bOpen").addEventListener("click", () => { if (!G.current) return alert("先に問題を表示してください"); Ops.start(); });
+$("#bClose").addEventListener("click", () => Ops.close());
+$("#bReveal").addEventListener("click", () => { if (G.current) Ops.reveal(G); });
+$("#manualAns").addEventListener("click", e => {
+  const b = e.target.closest("button[data-ans]");
+  if (b && G.current && confirm("「" + b.dataset.ans + "」を正解として発表しますか？")) Ops.reveal(G, b.dataset.ans);
+});
+$("#bLobby").addEventListener("click", () => Ops.lobby());
+$("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
+$("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答と正解を消して、やり直しますか？")) Ops.redo(G); });
+$("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付けを消去して最初に戻します。よろしいですか？\n（登録した問題は消えません）")) Ops.resetAll(G); });
+
+loadSetup();
+watchSetup(() => renderGame(G));
+watchGame(renderGame, tick);
+</script>
+</body>
+</html>

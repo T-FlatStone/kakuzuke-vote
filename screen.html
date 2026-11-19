@@ -1,217 +1,79 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="style.css">
-  <title>格付けチェック スクリーン</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<title>格付けチェック スクリーン</title>
 </head>
-
 <body>
-
 <main class="wrap">
-
-  <h1>格付けチェック</h1>
-
-  <!-- 問題・回答数・正解表示 -->
+  <h1 id="title">格付けチェック</h1>
   <div id="head" class="card"></div>
-
-  <!-- A～Pチーム表示 -->
-  <div id="teams" class="teams"></div>
-
+  <div id="body"></div>
 </main>
-
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-
-<!-- このアプリの設定 -->
 <script src="config.js"></script>
 <script src="app.js"></script>
-
-
 <script>
-
-//
-// Firebase Realtime Database を監視
-//
-// game 以下に変更が入るたび、
-// スクリーン表示を自動更新する。
-//
-db.ref("game").on("value", s => {
-
-  const g = {
-    ...defaults,
-    ...s.val()
-  };
-
-  // 現在の問題に対する各チームの回答
+function render(g) {
+  const ph = phaseOf(g);
   const vs = g.votes?.[g.current] || {};
+  document.querySelector("#title").textContent = g.title;
+  const head = document.querySelector("#head");
+  const body = document.querySelector("#body");
 
+  // 開始前
+  if (ph === "lobby") {
+    head.innerHTML = '<div class="big gold">' + esc(g.title) + '</div><p class="big" style="font-size:32px">まもなく開始します</p>';
+    body.innerHTML = "";
+    return;
+  }
 
-  // ====================================================
-  // 上部
-  // 問題番号 / 問題文 / 回答数 / 正解
-  // ====================================================
+  // 最終結果：ランク別にチームを表示
+  if (ph === "final") {
+    head.innerHTML = '<div class="big gold">最終格付け発表</div>';
+    body.innerHTML = '<div class="rankgrid">' + rankGroups(g).map(gr =>
+      '<div class="rankbox"><h3>' + esc(gr.rank) + '（' + gr.teams.length + '）</h3>' +
+      gr.teams.map(t => '<span class="t">' + t + '</span>').join("") + '</div>').join("") + '</div>';
+    return;
+  }
 
-  document.querySelector("#head").innerHTML =
-    '<div class="muted">' +
-      '第' + g.current + '問' +
-    '</div>' +
+  // 問題表示〜正解発表
+  let status;
+  if (ph === "answer") status = '<div class="big gold">正解は ' + esc(g.answer) + '！</div>';
+  else if (ph === "closed") status = '<div class="big">締切！</div>';
+  else if (ph === "open") status = '<div class="big">' + Object.keys(vs).length + ' / ' + C.teams.length + ' チーム回答</div><div class="timer huge" id="tm"></div>';
+  else status = '<div class="big" style="font-size:32px">まもなく回答開始</div>';
 
-    '<h2>' +
-      esc(g.question) +
-    '</h2>' +
+  head.innerHTML = '<div class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</div>' +
+    '<h2>' + esc(g.question) + '</h2>' + status;
 
-    (
-      g.phase === "answer"
+  body.innerHTML = '<div class="teams">' + C.teams.map(t => {
+    const v = vs[t];
+    let cls = "team";
+    if (ph === "answer" && v) cls += v === g.answer ? " ok" : " ng";
 
-        // 正解発表後
-        ? '<div class="big gold">' +
-            '正解は ' + esc(g.answer) + '！' +
-          '</div>'
+    const txt = ph === "answer"
+      ? (v ? esc(v) + " " + (v === g.answer ? "⭕" : "❌") : "未投票")
+      : ph === "closed"
+        ? (v ? "回答：" + esc(v) : "未投票")      // 締切の瞬間に回答を公開
+        : (v ? "回答済み" : "待機中");            // 受付中は中身を隠す
 
-        // 投票中・締切時
-        : '<div class="big">' +
-            Object.keys(vs).length +
-            ' / ' +
-            C.teams.length +
-            ' チーム回答' +
-          '</div>'
-    );
+    return '<div class="' + cls + '"><b>' + t + '</b><br>' + txt +
+      '<br><small>' + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + '</small></div>';
+  }).join("") + '</div>';
+}
 
+function tick(g) {
+  const el = document.querySelector("#tm");
+  if (!el) return;
+  const r = remainingSec(g);
+  el.textContent = r == null ? "" : r + " 秒";
+}
 
-  // ====================================================
-  // A～P 各チーム
-  // ====================================================
-
-  document.querySelector("#teams").innerHTML =
-    C.teams.map(t => {
-
-      // このチームの回答
-      // 未回答なら undefined
-      const v = vs[t];
-
-      let cls = "team";
-
-
-      // ------------------------------------------------
-      // 正解発表後
-      //
-      // 正解チーム → ok
-      // 不正解チーム → ng
-      // ------------------------------------------------
-
-      if (g.phase === "answer" && v) {
-
-        cls += v === g.answer
-          ? " ok"
-          : " ng";
-
-      }
-
-
-      // ------------------------------------------------
-      // 表示する文字
-      // ------------------------------------------------
-
-      const txt =
-
-        // =========================
-        // 正解発表後
-        // =========================
-        g.phase === "answer"
-
-          ? (
-              v
-
-                ? (
-                    v +
-                    " " +
-                    (
-                      v === g.answer
-                        ? "⭕"
-                        : "❌"
-                    )
-                  )
-
-                : "未投票"
-            )
-
-
-          // =========================
-          // 締切後
-          //
-          // ここで初めて
-          // A / B の回答を公開
-          // =========================
-
-          : g.phase === "closed"
-
-            ? (
-                v
-                  ? "回答：" + v
-                  : "未投票"
-              )
-
-
-            // =========================
-            // 投票中
-            //
-            // 回答内容は隠す
-            // =========================
-
-            : (
-                v
-                  ? "回答済み"
-                  : "待機中"
-              );
-
-
-      // ------------------------------------------------
-      // チームの現在ランク
-      // ------------------------------------------------
-
-      const rank =
-        C.ranks[
-          calcRank(
-            g.votes,
-            g.answers,
-            t
-          )
-        ];
-
-
-      // ------------------------------------------------
-      // チームカード生成
-      // ------------------------------------------------
-
-      return (
-        '<div class="' + cls + '">' +
-
-          '<b>' +
-            t +
-          '</b>' +
-
-          '<br>' +
-
-          txt +
-
-          '<br>' +
-
-          '<small>' +
-            esc(rank) +
-          '</small>' +
-
-        '</div>'
-      );
-
-    }).join("");
-
-});
-
+watchGame(render, tick);
 </script>
-
 </body>
 </html>
