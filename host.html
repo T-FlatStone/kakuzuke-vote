@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=4">
 <title>司会</title>
 </head>
 <body>
@@ -11,16 +11,16 @@
   <h1>司会</h1>
   <div class="card" id="info" aria-live="polite">読込中...</div>
   <div class="hostbtns">
-    <button type="button" class="hostbtn" id="bStart">回答開始</button>
-    <button type="button" class="hostbtn alt" id="bAnswer">正解発表</button>
-    <button type="button" class="hostbtn next" id="bNext">次の問題へ</button>
+    <button type="button" class="hostbtn" id="bStart" disabled>回答開始</button>
+    <button type="button" class="hostbtn alt" id="bAnswer" disabled>正解発表</button>
+    <button type="button" class="hostbtn next" id="bNext" disabled>次の問題へ</button>
   </div>
   <p class="muted center" id="hint"></p>
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=4"></script>
 <script>
 const $ = s => document.querySelector(s);
 let G = defaults;
@@ -29,15 +29,14 @@ function render(g) {
   G = g;
   const ph = phaseOf(g);
   const n = SETUP.questions.length;
-  const vs = g.votes?.[g.current] || {};
   const q = SETUP.questions[g.current - 1];
 
   let h = '<div class="row" style="justify-content:space-between"><b class="gold">' + PHASE_LABEL[ph] + '</b>' +
     '<span>' + (g.current ? '第' + g.current + '問 / 全' + n + '問' : '全' + n + '問') + '</span></div>';
   if (g.current && ph !== "lobby" && ph !== "final") {
     h += '<h2>' + esc(g.question) + '</h2>' +
-      '<div class="row" style="justify-content:space-between"><span>回答 <b class="gold">' + Object.keys(vs).length + '</b> / ' + C.teams.length + '</span>' +
-      '<span class="muted">正解（司会用）：' + esc(q?.answer || "未登録") + '</span></div><div class="timer" id="tm"></div>';
+      '<div class="row" style="justify-content:space-between"><span>回答 <b class="gold">' + countVotes(g) + '</b> / ' + SETUP.teams.length + '</span>' +
+      '<span class="muted">正解（司会用）：' + esc(q?.answer || "未登録") + '　失敗時 ↓' + (q ? q.penalty : 1) + '</span></div><div class="timer" id="tm"></div>';
   }
   $("#info").innerHTML = h;
 
@@ -82,8 +81,7 @@ $("#bNext").addEventListener("click", () => {
   }
 });
 
-watchSetup(() => render(G));
-watchGame(render, tick);
+watchAll(render, tick);
 </script>
 </body>
 </html>

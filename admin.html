@@ -3,39 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=4">
 <title>管理</title>
 </head>
 <body>
 <main class="wrap">
   <h1>管理ページ</h1>
-  <p class="muted"><a class="gold" href="host.html" target="_blank" rel="noopener">司会ページ</a>　/　<a class="gold" href="screen.html" target="_blank" rel="noopener">スクリーン</a></p>
+  <p class="muted"><a href="host.html" target="_blank" rel="noopener">司会ページ</a>　/　<a href="screen.html" target="_blank" rel="noopener">スクリーン</a></p>
 
-  <!-- ============ 事前設定 ============ -->
+  <!-- ============ 基本設定 ============ -->
   <section class="card">
-    <h2>事前設定</h2>
+    <h2>基本設定</h2>
     <div class="row">
       <label>タイトル <input id="title" type="text" maxlength="40" style="width:280px"></label>
       <label>制限時間 <input id="timer" type="number" min="0" max="600" style="width:90px"> 秒（0 = 無制限）</label>
     </div>
+  </section>
 
-    <h3>問題と正解</h3>
-    <table>
-      <thead><tr><th>#</th><th>問題文</th><th>選択肢</th><th>正解</th><th></th></tr></thead>
+  <!-- ============ チーム ============ -->
+  <section class="card">
+    <h2>チーム</h2>
+    <div class="row">
+      <label>チーム数 <input id="teamCount" type="number" min="1" max="52" style="width:90px"></label>
+      <button type="button" class="ctrl sub" id="copyUrls">投票URLを一覧でコピー</button>
+      <span id="copyMsg" class="muted" aria-live="polite"></span>
+    </div>
+    <div class="tablewrap"><table style="margin-top:10px">
+      <thead><tr><th>ID</th><th>チーム名（画面に表示）</th><th>投票URL</th></tr></thead>
+      <tbody id="trows"></tbody>
+    </table></div>
+    <p class="muted" style="font-size:13px">IDは投票URLの <code>?team=</code> に使う固定の記号です。チーム名を変えてもURLは変わりません。<br>チーム数を減らすと、末尾のチームから削除されます。</p>
+  </section>
+
+  <!-- ============ ランク ============ -->
+  <section class="card">
+    <h2>ランク（上から順に格下げ）</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>ランク名</th><th>背景色</th><th>見本</th><th></th></tr></thead>
+      <tbody id="rrows"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl sub" id="addR">＋ ランクを追加</button>
+      <span class="muted" style="font-size:13px">2〜10段階。一番下のランクより下には落ちません。</span>
+    </div>
+  </section>
+
+  <!-- ============ 問題 ============ -->
+  <section class="card">
+    <h2>問題と正解</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>問題文</th><th>選択肢</th><th>正解</th><th>失敗時↓</th><th></th></tr></thead>
       <tbody id="qrows"></tbody>
-    </table>
+    </table></div>
     <div class="row" style="margin-top:10px">
       <button type="button" class="ctrl sub" id="addQ">＋ 問題を追加</button>
-      <button type="button" class="ctrl" id="saveSetup">保存</button>
-      <span id="dirty" class="dirty" aria-live="polite"></span>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button type="button" class="ctrl sub" id="exportJ">JSONに書き出し</button>
-      <label class="ctrl sub" style="padding:10px 14px;border-radius:10px;background:#444;cursor:pointer">JSONから読込<input id="importJ" type="file" accept=".json,application/json" hidden></label>
-      <button type="button" class="ctrl sub" id="reload">保存済みの内容に戻す</button>
-    </div>
-    <p class="muted" style="font-size:13px">問題と正解はFirebaseに保存されます（GitHubには入りません）。JSON書き出しは手元バックアップ用です。<br>本番中に問題の順番を入れ替えると、過去の回答との対応がずれるので注意してください。</p>
+    <p class="muted" style="font-size:13px">「失敗時↓」は、不正解・未投票だったチームが下がるランク数です（0〜10、初期値1）。<br>本番中に問題の順番を入れ替えると、過去の回答との対応がずれるので注意してください。</p>
   </section>
+
+  <!-- ============ 保存バー ============ -->
+  <div class="savebar row">
+    <button type="button" class="ctrl" id="saveSetup">保存</button>
+    <span id="dirty" class="dirty" aria-live="polite"></span>
+    <span style="flex:1"></span>
+    <button type="button" class="ctrl sub" id="exportJ">JSON書き出し</button>
+    <label class="ctrl sub" style="padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700">JSON読込<input id="importJ" type="file" accept=".json,application/json" hidden></label>
+    <button type="button" class="ctrl sub" id="reload">保存済みに戻す</button>
+  </div>
 
   <!-- ============ 進行（手動操作） ============ -->
   <section class="card">
@@ -68,17 +102,91 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=4"></script>
 <script>
-if (typeof watchSetup !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
+if (typeof watchAll !== "function") alert("app.js が古いバージョンです。Ctrl+F5 で再読み込みしてください。");
 const $ = s => document.querySelector(s);
 let G = defaults;
-let rows = [];         // 編集中の問題 [{text, n, answer}]
+let teamRows = [], rankRows = [], rows = [];   // 編集中の内容
 let dirty = false;
 
-// ---------- 事前設定（エディタ） ----------
 function setDirty(v) { dirty = v; $("#dirty").textContent = v ? "未保存の変更があります" : ""; }
+const voteUrl = id => new URL("vote.html?team=" + encodeURIComponent(id), location.href).href;
 
+// ---------- チーム ----------
+function renderTeams() {
+  $("#teamCount").value = teamRows.length;
+  $("#trows").innerHTML = teamRows.map((t, i) =>
+    '<tr data-i="' + i + '"><td><b>' + esc(t.id) + '</b></td>' +
+    '<td><input type="text" data-f="name" maxlength="20" value="' + esc(t.name) + '" aria-label="' + esc(t.id) + 'のチーム名"></td>' +
+    '<td class="url"><a href="' + esc(voteUrl(t.id)) + '" target="_blank" rel="noopener">' + esc(voteUrl(t.id)) + '</a></td></tr>').join("");
+}
+$("#teamCount").addEventListener("change", () => {
+  const n = clampInt($("#teamCount").value, 1, MAX_TEAMS, teamRows.length || 1);
+  if (n === teamRows.length) { $("#teamCount").value = n; return; }   // 変化なしなら再描画しない
+  if (n < teamRows.length) {
+    const removed = teamRows.slice(n).map(t => t.name).join("、");
+    if (!confirm("次のチームを削除します：\n" + removed)) { renderTeams(); return; }
+    teamRows = teamRows.slice(0, n);
+  }
+  while (teamRows.length < n) { const id = nextTeamId(teamRows); teamRows.push({ id, name: id + "チーム" }); }
+  renderTeams(); setDirty(true);
+});
+$("#trows").addEventListener("input", e => {
+  const tr = e.target.closest("tr");
+  if (!tr || e.target.dataset.f !== "name") return;
+  teamRows[+tr.dataset.i].name = e.target.value;
+  setDirty(true);
+});
+$("#copyUrls").addEventListener("click", async () => {
+  const text = teamRows.map(t => t.name + "\t" + voteUrl(t.id)).join("\n");
+  try { await navigator.clipboard.writeText(text); $("#copyMsg").textContent = "コピーしました（Excelに貼れます）"; }
+  catch (e) { prompt("コピーできなかったので、ここから手動でコピーしてください", text.replace(/\n/g, " / ")); }
+  setTimeout(() => $("#copyMsg").textContent = "", 3000);
+});
+
+// ---------- ランク ----------
+function renderRanks() {
+  $("#rrows").innerHTML = rankRows.map((r, i) =>
+    '<tr data-i="' + i + '"><td>' + (i + 1) + '</td>' +
+    '<td><input type="text" data-f="name" maxlength="20" value="' + esc(r.name) + '" aria-label="' + (i + 1) + '番目のランク名"></td>' +
+    '<td><input type="color" data-f="color" value="' + esc(r.color) + '" aria-label="' + (i + 1) + '番目のランクの背景色"></td>' +
+    '<td>' + rankBadge(r) + '</td>' +
+    '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up" aria-label="上へ">↑</button>' +
+    '<button type="button" class="ctrl sub" data-act="down" aria-label="下へ">↓</button>' +
+    '<button type="button" class="ctrl danger" data-act="del" aria-label="削除">✕</button></td></tr>').join("");
+}
+$("#rrows").addEventListener("input", e => {
+  const tr = e.target.closest("tr"), f = e.target.dataset.f;
+  if (!tr || !f) return;
+  const r = rankRows[+tr.dataset.i];
+  r[f] = e.target.value;
+  // 見本だけ更新（再描画するとカラーピッカーが閉じるため）
+  tr.querySelector(".badge").outerHTML = rankBadge(r);
+  setDirty(true);
+});
+$("#rrows").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const i = +b.closest("tr").dataset.i, a = b.dataset.act;
+  if (a === "del") {
+    if (rankRows.length <= 2) { alert("ランクは2つ以上必要です"); return; }
+    if (!confirm("「" + rankRows[i].name + "」を削除しますか？")) return;
+    rankRows.splice(i, 1);
+  }
+  if (a === "up" && i > 0) [rankRows[i - 1], rankRows[i]] = [rankRows[i], rankRows[i - 1]];
+  if (a === "down" && i < rankRows.length - 1) [rankRows[i + 1], rankRows[i]] = [rankRows[i], rankRows[i + 1]];
+  renderRanks(); setDirty(true);
+});
+$("#addR").addEventListener("click", () => {
+  if (rankRows.length >= MAX_RANKS) { alert("ランクは最大" + MAX_RANKS + "段階です"); return; }
+  rankRows.push({ name: "", color: "#555555" });
+  renderRanks(); setDirty(true);
+  const inputs = document.querySelectorAll('#rrows input[data-f="name"]');
+  inputs[inputs.length - 1].focus();
+});
+
+// ---------- 問題 ----------
 function renderRows() {
   $("#qrows").innerHTML = rows.map((q, i) => {
     const n = clampN(q.n);
@@ -88,12 +196,12 @@ function renderRows() {
       '<td><input type="text" data-f="text" maxlength="80" value="' + esc(q.text) + '" aria-label="第' + (i + 1) + '問の問題文"></td>' +
       '<td><select data-f="n" aria-label="選択肢">' + nSel + '</select></td>' +
       '<td><select data-f="answer" aria-label="正解">' + aSel + '</select></td>' +
+      '<td><input type="number" data-f="penalty" min="0" max="10" value="' + esc(q.penalty) + '" aria-label="第' + (i + 1) + '問の失敗時の降格数"></td>' +
       '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up" aria-label="上へ">↑</button>' +
       '<button type="button" class="ctrl sub" data-act="down" aria-label="下へ">↓</button>' +
       '<button type="button" class="ctrl danger" data-act="del" aria-label="削除">✕</button></td></tr>';
-  }).join("") || '<tr><td colspan="5" class="muted">問題がありません。「＋ 問題を追加」で追加してください。</td></tr>';
+  }).join("") || '<tr><td colspan="6" class="muted">問題がありません。「＋ 問題を追加」で追加してください。</td></tr>';
 }
-
 $("#qrows").addEventListener("input", e => {
   const tr = e.target.closest("tr"), f = e.target.dataset.f;
   if (!tr || !f) return;
@@ -118,7 +226,7 @@ $("#qrows").addEventListener("click", e => {
   renderRows(); setDirty(true);
 });
 $("#addQ").addEventListener("click", () => {
-  rows.push({ text: "", n: 2, answer: "" });
+  rows.push({ text: "", n: 2, answer: "", penalty: 1 });
   renderRows(); setDirty(true);
   const inputs = document.querySelectorAll('#qrows input[data-f="text"]');
   if (inputs.length) inputs[inputs.length - 1].focus();
@@ -126,47 +234,59 @@ $("#addQ").addEventListener("click", () => {
 $("#title").addEventListener("input", () => setDirty(true));
 $("#timer").addEventListener("input", () => setDirty(true));
 
+// ---------- 読込・保存 ----------
+function fillEditor(s, title) {
+  teamRows = s.teams.map(t => ({ ...t }));
+  rankRows = s.ranks.map(r => ({ ...r }));
+  rows = s.questions.map(q => ({ ...q }));
+  $("#timer").value = s.timerSec;
+  if (title != null) $("#title").value = title;
+  renderTeams(); renderRanks(); renderRows();
+}
+async function loadSetup() {
+  const [s, t] = await Promise.all([db.ref("setup").once("value"), db.ref("game/title").once("value")]);
+  fillEditor(normalizeSetup(s.val()), t.val() || defaults.title);
+  setDirty(false);
+}
+$("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中の内容を破棄しますか？")) loadSetup(); });
+
 $("#saveSetup").addEventListener("click", async () => {
-  const clean = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "" }));
-  const bad = clean.findIndex(q => !q.text || !q.answer);
-  if (bad >= 0) { alert("第" + (bad + 1) + "問の問題文または正解が未入力です"); return; }
-  const timerSec = Math.min(600, Math.max(0, parseInt($("#timer").value, 10) || 0));
-  $("#timer").value = timerSec;
+  const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim() }));
+  const ranks = rankRows.map(r => ({ name: String(r.name || "").trim(), color: r.color }));
+  const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1) }));
+  let i;
+  if (!teams.length) return alert("チームが1つもありません");
+  if ((i = teams.findIndex(t => !t.name)) >= 0) return alert("チーム「" + teams[i].id + "」の名前が未入力です");
+  if (ranks.length < 2) return alert("ランクは2つ以上必要です");
+  if ((i = ranks.findIndex(r => !r.name)) >= 0) return alert((i + 1) + "番目のランク名が未入力です");
+  if ((i = questions.findIndex(q => !q.text || !q.answer)) >= 0) return alert("第" + (i + 1) + "問の問題文または正解が未入力です");
+  const timerSec = clampInt($("#timer").value, 0, 600, 0);
+
   const btn = $("#saveSetup");
   btn.disabled = true;
   $("#dirty").textContent = "保存中...";
   try {
-    await db.ref("setup").set({ questions: clean, timerSec });
-    await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: clean.length });
-    rows = clean; renderRows(); setDirty(false);
+    await db.ref("setup").set({ questions, timerSec, teams, ranks });
+    await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: questions.length });
+    fillEditor({ questions, timerSec, teams, ranks });
+    setDirty(false);
     $("#dirty").textContent = "✔ 保存しました";
     setTimeout(() => { if (!dirty) $("#dirty").textContent = ""; }, 3000);
   } catch (err) {
     console.error(err);
     $("#dirty").textContent = "保存に失敗しました";
     const msg = String(err && (err.code || err.message) || err);
-    alert("保存に失敗しました：" + msg +
-      (/permission/i.test(msg) ? "\n\nFirebaseのルールで setup への書き込みが許可されていません。" : ""));
+    alert("保存に失敗しました：" + msg + (/permission/i.test(msg) ? "\n\nFirebaseのルールで setup への書き込みが許可されていません。" : ""));
   } finally {
     btn.disabled = false;
   }
 });
 
-async function loadSetup() {
-  const [s, t] = await Promise.all([db.ref("setup").once("value"), db.ref("game/title").once("value")]);
-  const v = s.val() || {};
-  rows = toArr(v.questions).map(q => ({ text: q.text || "", n: clampN(q.n), answer: q.answer || "" }));
-  $("#timer").value = Math.max(0, parseInt(v.timerSec, 10) || 0);
-  $("#title").value = t.val() || defaults.title;
-  renderRows(); setDirty(false);
-}
-$("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中の内容を破棄しますか？")) loadSetup(); });
-
 $("#exportJ").addEventListener("click", () => {
-  const data = { title: $("#title").value, timerSec: +$("#timer").value || 0, questions: rows };
+  const data = { title: $("#title").value, timerSec: clampInt($("#timer").value, 0, 600, 0), teams: teamRows, ranks: rankRows, questions: rows };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  a.download = "kakuzuke_questions.json";
+  a.download = "kakuzuke_setup.json";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
@@ -176,10 +296,8 @@ $("#importJ").addEventListener("change", async e => {
   if (!f) return;
   try {
     const d = JSON.parse(await f.text());
-    rows = toArr(d.questions).map(q => ({ text: String(q.text || ""), n: clampN(q.n), answer: LETTERS.includes(q.answer) ? q.answer : "" }));
-    if (d.title) $("#title").value = d.title;
-    if (d.timerSec != null) $("#timer").value = Math.max(0, parseInt(d.timerSec, 10) || 0);
-    renderRows(); setDirty(true);
+    fillEditor(normalizeSetup(d), d.title || null);
+    setDirty(true);
     alert("読み込みました。「保存」を押すと反映されます。");
   } catch (err) { alert("JSONの読み込みに失敗しました"); }
 });
@@ -191,17 +309,22 @@ function renderGame(g) {
   const ph = phaseOf(g), vs = g.votes?.[g.current] || {};
   const q = SETUP.questions[g.current - 1];
   $("#state").innerHTML = '状態：<b class="gold">' + PHASE_LABEL[ph] + '</b>　' +
-    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　回答 ' + Object.keys(vs).length + '/' + C.teams.length + '　登録正解：' + esc(q?.answer || "未登録") : '問題未選択') +
+    (g.current ? '第' + g.current + '問「' + esc(g.question) + '」　回答 ' + countVotes(g) + '/' + SETUP.teams.length +
+      '　登録正解：' + esc(q?.answer || "未登録") + '　失敗時↓' + (q ? q.penalty : 1) : '問題未選択') +
     '　<span class="timer" id="tm" style="font-size:20px;display:inline"></span>';
 
   const jump = $("#jump"), keep = jump.value;
   jump.innerHTML = SETUP.questions.map((qq, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '. ' + esc(qq.text) + '</option>').join("");
-  jump.value = keep || String(Math.min(g.current + 1, SETUP.questions.length) || 1);
+  if (keep && +keep <= SETUP.questions.length) jump.value = keep;
+  else jump.value = String(Math.min(g.current + 1, SETUP.questions.length) || 1);
 
   $("#manualAns").innerHTML = (g.choices || ["A", "B"]).map(L => '<button type="button" class="ctrl sub" data-ans="' + L + '">' + L + '</button>').join("");
 
-  $("#teams").innerHTML = C.teams.map(t => '<div class="team"><b>' + t + '</b><br>' + esc(vs[t] || "-") +
-    '<br><small>' + esc(C.ranks[calcRank(g.votes, g.answers, t)]) + '</small></div>').join("");
+  $("#teams").innerHTML = SETUP.teams.map(t => {
+    const r = rankOf(g, t.id);
+    return '<div class="team" style="' + rankStyle(r) + '"><b>' + esc(t.name) + '</b><div class="ans">' + esc(vs[t.id] || "-") +
+      '</div><small>' + esc(r.name) + '</small></div>';
+  }).join("");
 }
 function tick(g) {
   autoClose(g);
@@ -222,11 +345,10 @@ $("#manualAns").addEventListener("click", e => {
 $("#bLobby").addEventListener("click", () => Ops.lobby());
 $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
 $("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答と正解を消して、やり直しますか？")) Ops.redo(G); });
-$("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付けを消去して最初に戻します。よろしいですか？\n（登録した問題は消えません）")) Ops.resetAll(G); });
+$("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付けを消去して最初に戻します。よろしいですか？\n（登録した問題・チーム・ランクは消えません）")) Ops.resetAll(G); });
 
 loadSetup();
-watchSetup(() => renderGame(G));
-watchGame(renderGame, tick);
+watchAll(renderGame, tick);
 </script>
 </body>
 </html>

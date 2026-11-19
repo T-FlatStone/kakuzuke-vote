@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=4">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -14,23 +14,28 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=4"></script>
 <script>
 const app = document.querySelector("#app");
 let G = defaults;
 
 function render(g) {
   G = g;
-  const ph = phaseOf(g);
   document.querySelector("#title").textContent = g.title;
-  const mine = g.votes?.[g.current]?.[team] || "";
-  const rank = C.ranks[calcRank(g.votes, g.answers, team)];
-  let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">チーム ' + team + '</h2><span class="gold">' + esc(rank) + '</span></div>';
+  const me = findTeam(teamParam);
+  if (!me) {
+    app.innerHTML = "<b>チームが見つかりません。</b><p>配られたURL（QRコード）から開き直してください。</p>";
+    return;
+  }
+  const ph = phaseOf(g);
+  const mine = g.votes?.[g.current]?.[me.id] || "";
+  const r = rankOf(g, me.id);
+  let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(me.name) + '</h2>' + rankBadge(r) + '</div>';
 
   if (ph === "lobby") {
     h += '<p class="big">まもなく開始します</p>';
   } else if (ph === "final") {
-    h += '<p class="muted center">最終格付け</p><div class="big gold">' + esc(rank) + '</div>';
+    h += '<p class="muted center">最終格付け</p><div class="center">' + rankBadge(r, "huge") + '</div>';
   } else {
     h += '<p class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</p><h2>' + esc(g.question) + '</h2>';
     if (ph === "open") {
@@ -40,8 +45,10 @@ function render(g) {
     } else if (ph === "closed") {
       h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b></p>';
     } else if (ph === "answer") {
+      const d = dropOf(g, me.id);
       h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' +
-        (mine ? (mine === g.answer ? "⭕ 正解！" : "❌ 不正解") : "未投票") + '</p>';
+        (mine === g.answer ? "⭕ 正解！" : mine ? "❌ 不正解" : "⏰ 未投票") + '</p>' +
+        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>';
     } else {
       h += '<p class="big">回答開始までお待ちください</p>';
     }
@@ -49,7 +56,7 @@ function render(g) {
   app.innerHTML = h;
   app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
     if (phaseOf(G) !== "open") return;
-    db.ref("game/votes/" + G.current + "/" + team).set(b.dataset.v);
+    db.ref("game/votes/" + G.current + "/" + me.id).set(b.dataset.v);
   }));
 }
 
@@ -60,11 +67,7 @@ function tick(g) {
   el.textContent = r == null ? "" : "残り " + r + " 秒";
 }
 
-if (!C.teams.includes(team)) {
-  app.innerHTML = "<b>チーム指定が不正です。</b><p>URLの末尾に ?team=A ～ ?team=" + C.teams[C.teams.length - 1] + " を付けて開いてください。</p>";
-} else {
-  watchGame(render, tick);
-}
+watchAll(render, tick);
 </script>
 </body>
 </html>
