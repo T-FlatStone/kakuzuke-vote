@@ -71,3 +71,18 @@ input[type=color]{padding:2px;width:52px;height:40px}
 .savebar{position:sticky;bottom:0;z-index:5;background:#1b1626f2;border:1px solid #e7c55b66;border-radius:14px;padding:12px;margin-top:14px}
 @media(max-width:700px){.teams{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.rankgrid{grid-template-columns:1fr 1fr}.choice{font-size:28px}.big{font-size:34px}.timer.huge{font-size:48px}.badge.huge{font-size:28px}
  .place{grid-template-columns:70px 1fr;gap:6px 12px}.place .no{font-size:28px}.place .nm,.place.p1 .nm{font-size:24px}}
+
+
+/* ===== v8: 固定レイアウトの大きなカウントダウン ===== */
+.screen-statusline{display:grid;grid-template-columns:minmax(0,1fr) 280px;align-items:center;gap:22px;min-height:104px;margin-top:10px}
+.screen-status-main{min-width:0;font-size:42px;line-height:1.15;font-weight:900;text-align:left}
+.screen-timer-slot{width:280px;min-height:92px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.screen-timer{min-width:260px;font-size:72px;line-height:1;font-weight:900;text-align:right;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.screen-timer.warn10{color:#f4d13d}
+.screen-timer.danger5{color:#ff5a5a;text-shadow:0 0 20px #ff5a5a88}
+.screen-timer.closed{font-size:54px;color:#ff5a5a;letter-spacing:0}
+.vote-timer-slot{min-height:48px;margin-top:8px;display:flex;align-items:center;justify-content:center}
+.vote-timer{font-size:32px;line-height:1;min-width:180px;font-weight:900;text-align:center;color:#ff7a7a;font-variant-numeric:tabular-nums}
+.vote-timer.warn10{color:#f4d13d}
+.vote-timer.danger5{color:#ff5a5a;text-shadow:0 0 12px #ff5a5a88}
+@media(max-width:700px){.screen-statusline{grid-template-columns:1fr 170px;gap:10px;min-height:82px}.screen-status-main{font-size:28px}.screen-timer-slot{width:170px;min-height:72px}.screen-timer{min-width:160px;font-size:52px}.screen-timer.closed{font-size:36px}}
