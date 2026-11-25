@@ -14,9 +14,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 7) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 8) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
 let G = defaults, busy = false;
 
@@ -51,7 +51,7 @@ function render(g) {
         h += '<button type="button" class="confirm" id="confirm"' + (mine ? '' : ' disabled') + '>' + (mine ? esc(mine) + ' で確定する' : '選んでから確定') + '</button>' +
           '<p class="muted center">確定するまで選び直せます。確定までの速さも順位に影響します</p>';
       }
-      h += '<div class="vote-timer-slot"><div class="vote-timer" id="tm" aria-live="off"></div></div>';
+      h += '<div class="timer" id="tm" aria-live="off"></div>';
     } else if (ph === "closed") {
       h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b>' +
         (mine && !conf ? '（未確定）' : '') + '</p>';
@@ -90,12 +90,9 @@ function tick(g) {
   const el = document.querySelector("#tm");
   if (!el) return;
   const r = remainingSec(g);
-  el.className = "vote-timer";
-  if (r == null) { el.textContent = ""; return; }
-  if (r <= 5) el.classList.add("danger5");
-  else if (r <= 10) el.classList.add("warn10");
-  el.textContent = "残り " + r + " 秒";
+  el.textContent = r == null ? "" : "残り " + r + " 秒";
 }
+
 watchAll(render, tick);
 </script>
 </body>

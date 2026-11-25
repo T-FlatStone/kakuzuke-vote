@@ -1,6 +1,7 @@
 {
   "rules": {
     ".read": true,
-    "game": { ".write": true }
+    "game":  { ".write": true },
+    "setup": { ".write": true }
   }
 }

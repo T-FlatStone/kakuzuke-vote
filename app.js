@@ -3,7 +3,7 @@ const C = window.KAKUZUKE_CONFIG || {};
 firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
-const APP_VERSION = 6;
+const APP_VERSION = 8;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -88,6 +88,21 @@ function missingTimes(g) {
 }
 const fmtSec = ms => ms == null ? "-" : (ms / 1000).toFixed(2) + "秒";
 
+
+// 管理画面向け：現在問の計測時間。受付中の未確定は現在まで、締切後は締切まで。
+function currentTimeMs(g, id) {
+  const q = g.current, opened = g.opened?.[q];
+  if (!opened) return null;
+  const c = confirmOf(g, q, id);
+  if (c?.at) return Math.max(0, c.at - opened);
+  const end = g.closed?.[q] || (phaseOf(g) === "open" ? serverNow() : null);
+  return end ? Math.max(0, end - opened) : null;
+}
+function completedTimeCount(g, id) {
+  return Object.keys(g.answers || {}).filter(q => timeMs(g, q, id) != null).length;
+}
+function completedQuestionCount(g) { return Object.keys(g.answers || {}).length; }
+
 // ===== 格付け計算 =====
 // 正解発表済みの問題で「不正解」または「未投票」なら、その問題の降格数だけランクダウン
 function penaltyAt(g, q) { return clampInt(g.penalties?.[q], 0, MAX_PENALTY, 1); }
@@ -129,7 +144,7 @@ function textColor(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111" : "#fff";
 }
 // 選択肢ごとの色（締切後のチームカード背景）
-const CHOICE_COLORS = { A: "#d93636", B: "#2f6fd6", C: "#e6c229", D: "#2e9e5b" };
+const CHOICE_COLORS = { A: "#d93636", B: "#2e9e5b", C: "#e6c229", D: "#2f6fd6" };
 const NOVOTE_COLOR = "#4a4a4a";
 const choiceStyle = v => { const c = CHOICE_COLORS[v] || NOVOTE_COLOR; return "background:" + c + ";color:" + textColor(c); };
 const rankStyle = r => "background:" + r.color + ";color:" + textColor(r.color);

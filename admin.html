@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=8">
 <title>管理</title>
 </head>
 <body>
 <main class="wrap">
-  <h1>管理ページ</h1>
+  <h1>管理ページ <small style="font-size:14px;color:#aaa">v8</small></h1>
+  <div id="versionGuard" style="display:none;background:#8b1d1d;color:#fff;border:3px solid #ff6b6b;border-radius:14px;padding:16px;margin:12px 0;font-weight:900;font-size:20px">⚠ 古いシステムを検出しました。回答時間が計測されません。GitHubの最新版を反映して Ctrl+F5 で再読み込みしてください。</div>
   <p class="muted"><a href="host.html" target="_blank" rel="noopener">司会ページ</a>　/　<a href="screen.html" target="_blank" rel="noopener">スクリーン</a></p>
 
   <section class="card">
@@ -96,9 +97,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 6) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 8) { document.querySelector("#versionGuard").style.display = "block"; alert("⚠ 古い app.js を検出しました。回答時間が計測されません。最新版を反映して Ctrl+F5 で再読み込みしてください。"); }
 const $ = s => document.querySelector(s);
 let G = defaults;
 let teamRows = [], rankRows = [], rows = [];
@@ -316,26 +317,35 @@ function renderGame(g) {
   $("#manualAns").innerHTML = (g.choices || ["A", "B"]).map(L => '<button type="button" class="ctrl sub" data-ans="' + L + '">' + L + '</button>').join("");
 
   if (ph === "final") {
-    // 最終結果になったら順位順＋回答時間の合計を表示
     $("#teamsTitle").textContent = "最終順位";
     $("#teamsNote").textContent = "格付けが上ほど上位、同じ格付けなら回答時間の合計が短いほど上位";
     $("#teams").innerHTML = standings(g).map(x => {
       const r = SETUP.ranks[x.ri];
+      const complete = completedTimeCount(g, x.team.id) === completedQuestionCount(g);
       return '<div class="team" style="' + rankStyle(r) + '"><b>' + x.place + '位 ' + esc(x.team.name) + '</b>' +
-        '<div class="ans">' + esc(r.name) + '</div><small>合計 ' + fmtSec(x.ms) + '</small></div>';
+        '<div class="ans">' + esc(r.name) + '</div><small>合計 ' + (complete ? fmtSec(x.ms) : '⚠ 計測不完全') + '</small></div>';
     }).join("");
   } else {
-    // 本番中は順位・時間を出さない（チーム順で今の回答状況だけ）
-    $("#teamsTitle").textContent = "各チームの状況";
-    $("#teamsNote").textContent = "順位と回答時間は最終結果発表まで表示しません";
+    // 管理画面だけ、現在問と累計のタイムを確認可能。参加者・スクリーンには公開しない。
+    $("#teamsTitle").textContent = "各チームの状況・計測時間";
+    $("#teamsNote").textContent = "今回＝回答開始→確定（未確定は現在まで／締切後は締切まで）、合計＝正解発表済み問題の累計";
     $("#teams").innerHTML = SETUP.teams.map(t => {
-      const r = rankOf(g, t.id);
-      const v = voteOf(g, g.current, t.id), conf = confirmOf(g, g.current, t.id);
+      const r = rankOf(g, t.id), v = voteOf(g, g.current, t.id), conf = confirmOf(g, g.current, t.id);
+      const cur = g.current ? currentTimeMs(g, t.id) : null;
+      const done = completedTimeCount(g, t.id), qn = completedQuestionCount(g), opened = g.opened?.[g.current];
+      let curText;
+      if (!g.current) curText = "-";
+      else if (!opened) curText = "⚠ 未計測";
+      else if (conf) curText = fmtSec(cur);
+      else if (phaseOf(g) === "open") curText = fmtSec(cur) + "（計測中）";
+      else curText = fmtSec(cur) + "（未確定）";
+      const totalText = qn === 0 ? "0.00秒" : (done === qn ? fmtSec(totalMs(g, t.id)) : "⚠ 計測不完全 " + done + "/" + qn + "問");
       return '<div class="team" style="' + rankStyle(r) + '"><b>' + esc(t.name) + '</b>' +
-        '<div class="ans">' + esc(v || "-") + (conf ? ' ✔' : v ? ' (未確定)' : '') + '</div><small>' + esc(r.name) + '</small></div>';
+        '<div class="ans">' + esc(v || "-") + (conf ? ' ✔' : v ? ' (未確定)' : '') + '</div>' +
+        '<div><small>今回：<b>' + curText + '</b></small></div>' +
+        '<div><small>現在合計：<b>' + totalText + '</b></small></div><div><small>' + esc(r.name) + '</small></div></div>';
     }).join("");
-  }
-}
+  }}
 function tick(g) {
   autoClose(g);
   const el = $("#tm");
