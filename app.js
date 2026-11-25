@@ -129,7 +129,7 @@ function textColor(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111" : "#fff";
 }
 // 選択肢ごとの色（締切後のチームカード背景）
-const CHOICE_COLORS = { A: "#d93636", B: "#2e9e5b", C: "#e6c229", D: "#2f6fd6" };
+const CHOICE_COLORS = { A: "#d93636", B: "#2f6fd6", C: "#e6c229", D: "#2e9e5b" };
 const NOVOTE_COLOR = "#4a4a4a";
 const choiceStyle = v => { const c = CHOICE_COLORS[v] || NOVOTE_COLOR; return "background:" + c + ";color:" + textColor(c); };
 const rankStyle = r => "background:" + r.color + ";color:" + textColor(r.color);
