@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <title>管理</title>
 </head>
 <body>
@@ -28,7 +28,7 @@
       <span id="copyMsg" class="muted" aria-live="polite"></span>
     </div>
     <div class="tablewrap"><table style="margin-top:10px">
-      <thead><tr><th>ID</th><th>チーム名（画面に表示）</th><th>投票URL</th></tr></thead>
+      <thead><tr><th>ID</th><th>チーム名（画面に表示）</th><th>キー</th><th>投票URL</th><th></th></tr></thead>
       <tbody id="trows"></tbody>
     </table></div>
     <p class="muted" style="font-size:13px">IDは投票URLの <code>?team=</code> に使う固定の記号です。チーム名を変えてもURLは変わりません。<br>チーム数を減らすと、末尾のチームから削除されます。</p>
@@ -98,9 +98,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 9) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 10) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
 const auth = firebase.auth();
 const loginView = document.querySelector("#loginView"), protectedApp = document.querySelector("#protectedApp"), loginError = document.querySelector("#loginError");
@@ -117,7 +117,7 @@ let teamRows = [], rankRows = [], rows = [];
 let dirty = false;
 
 function setDirty(v) { dirty = v; $("#dirty").textContent = v ? "未保存の変更があります" : ""; }
-const voteUrl = id => new URL("vote.html?team=" + encodeURIComponent(id), location.href).href;
+const voteUrl = t => new URL("vote.html?team=" + encodeURIComponent(t.id) + "&key=" + encodeURIComponent(t.key), location.href).href;
 
 // ---------- チーム ----------
 function renderTeams() {
@@ -125,7 +125,9 @@ function renderTeams() {
   $("#trows").innerHTML = teamRows.map((t, i) =>
     '<tr data-i="' + i + '"><td><b>' + esc(t.id) + '</b></td>' +
     '<td><input type="text" data-f="name" maxlength="20" value="' + esc(t.name) + '" aria-label="' + esc(t.id) + 'のチーム名"></td>' +
-    '<td class="url"><a href="' + esc(voteUrl(t.id)) + '" target="_blank" rel="noopener">' + esc(voteUrl(t.id)) + '</a></td></tr>').join("");
+    '<td><code>' + esc(t.key.slice(0, 6)) + '…' + esc(t.key.slice(-4)) + '</code></td>' +
+    '<td class="url"><a href="' + esc(voteUrl(t)) + '" target="_blank" rel="noopener">' + esc(voteUrl(t)) + '</a></td>' +
+    '<td><button type="button" class="ctrl sub" data-keygen="' + i + '">キー再発行</button></td></tr>').join("");
 }
 $("#teamCount").addEventListener("change", () => {
   const n = clampInt($("#teamCount").value, 1, MAX_TEAMS, teamRows.length || 1);
@@ -135,7 +137,7 @@ $("#teamCount").addEventListener("change", () => {
     if (!confirm("次のチームを削除します：\n" + removed)) { renderTeams(); return; }
     teamRows = teamRows.slice(0, n);
   }
-  while (teamRows.length < n) { const id = nextTeamId(teamRows); teamRows.push({ id, name: id + "チーム" }); }
+  while (teamRows.length < n) { const id = nextTeamId(teamRows); teamRows.push({ id, name: id + "チーム", key: randomTeamKey() }); }
   renderTeams(); setDirty(true);
 });
 $("#trows").addEventListener("input", e => {
@@ -144,8 +146,14 @@ $("#trows").addEventListener("input", e => {
   teamRows[+tr.dataset.i].name = e.target.value;
   setDirty(true);
 });
+$("#trows").addEventListener("click", e => {
+  const b = e.target.closest("button[data-keygen]"); if (!b) return;
+  const i = +b.dataset.keygen, t = teamRows[i];
+  if (!confirm(t.name + " のキーを再発行しますか？\n現在のQRコード・URLは使えなくなります。")) return;
+  t.key = randomTeamKey(); renderTeams(); setDirty(true);
+});
 $("#copyUrls").addEventListener("click", async () => {
-  const text = teamRows.map(t => t.name + "\t" + voteUrl(t.id)).join("\n");
+  const text = teamRows.map(t => t.name + "\t" + voteUrl(t)).join("\n");
   try { await navigator.clipboard.writeText(text); $("#copyMsg").textContent = "コピーしました（Excelに貼れます）"; }
   catch (e) { prompt("コピーできなかったので、ここから手動でコピーしてください", text.replace(/\n/g, " / ")); }
   setTimeout(() => $("#copyMsg").textContent = "", 3000);
@@ -256,7 +264,7 @@ async function loadSetup() {
 $("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中の内容を破棄しますか？")) loadSetup(); });
 
 $("#saveSetup").addEventListener("click", async () => {
-  const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim() }));
+  const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim(), key: t.key || randomTeamKey() }));
   const ranks = rankRows.map(r => ({ name: String(r.name || "").trim(), color: r.color }));
   const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1) }));
   let i;
@@ -291,7 +299,8 @@ $("#exportJ").addEventListener("click", () => {
   const data = { title: $("#title").value, timerSec: clampInt($("#timer").value, 0, 600, 0), teams: teamRows, ranks: rankRows, questions: rows };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  a.download = "kakuzuke_setup.json";
+  const d = new Date(); const z = n => String(n).padStart(2,"0");
+  a.download = "kakuzuke_setup_" + d.getFullYear() + z(d.getMonth()+1) + z(d.getDate()) + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + ".json";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });

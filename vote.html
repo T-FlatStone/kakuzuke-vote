@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -14,18 +14,19 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 9) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 10) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
+const teamKeyParam = (new URLSearchParams(location.search).get("key") || "").trim();
 let G = defaults, busy = false;
 
 function render(g) {
   G = g;
   document.querySelector("#title").textContent = g.title;
   const me = findTeam(teamParam);
-  if (!me) {
-    app.innerHTML = "<b>チームが見つかりません。</b><p>配られたURL（QRコード）から開き直してください。</p>";
+  if (!me || !teamKeyParam || teamKeyParam !== me.key) {
+    app.innerHTML = "<b>投票URLが無効です。</b><p>配られたQRコードから開き直してください。</p>";
     return;
   }
   const ph = phaseOf(g);

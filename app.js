@@ -3,7 +3,7 @@ const C = window.KAKUZUKE_CONFIG || {};
 firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -24,16 +24,20 @@ const BEST_N = 4;   // 最終結果で発表する順位数
 // チームID：0→A, 25→Z, 26→AA …（投票URLの ?team= に使う）
 function teamIdAt(i) { let s = ""; i++; while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
 function nextTeamId(teams) { const used = new Set(teams.map(t => t.id)); for (let i = 0; ; i++) { const id = teamIdAt(i); if (!used.has(id)) return id; } }
+function randomTeamKey() {
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, "0")).join("");
+}
 function defaultTeams() {
   const ids = Array.isArray(C.teams) && C.teams.length ? C.teams : "ABCDEFGHIJKLMNOP".split("");
-  return ids.map(id => ({ id: String(id).toUpperCase(), name: String(id).toUpperCase() + "チーム" }));
+  return ids.map(id => ({ id: String(id).toUpperCase(), name: String(id).toUpperCase() + "チーム", key: randomTeamKey() }));
 }
 function defaultRanks() { return DEFAULT_RANK_NAMES.map((n, i) => ({ name: n, color: DEFAULT_RANK_COLORS[i] })); }
 
 // DB の setup を安全な形にそろえる
 function normalizeSetup(v) {
   v = v || {};
-  const teams = toArr(v.teams).map(t => ({ id: String(t.id || "").toUpperCase(), name: String(t.name || t.id || "") }))
+  const teams = toArr(v.teams).map(t => ({ id: String(t.id || "").toUpperCase(), name: String(t.name || t.id || ""), key: /^[0-9a-f]{32}$/i.test(t.key || "") ? t.key : randomTeamKey() }))
     .filter(t => /^[A-Z]{1,2}$/.test(t.id));
   const ranks = toArr(v.ranks).map(r => ({ name: String(r.name || ""), color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : "#555555" }));
   return {
