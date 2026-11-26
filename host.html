@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=8.2">
+<link rel="stylesheet" href="style.css?v=9">
 <title>司会</title>
 </head>
 <body>
-<main class="wrap" style="max-width:640px">
-  <h1>司会 <small style="font-size:14px;color:#aaa">v8</small></h1>
+<div id="loginView" class="auth-shell"><div class="auth-card"><h1>司会ログイン</h1><form id="loginForm"><label for="loginId">ID（メールアドレス）</label><input id="loginId" type="email" autocomplete="username" required><label for="loginPw">パスワード</label><input id="loginPw" type="password" autocomplete="current-password" required><button class="ctrl" type="submit">ログイン</button><div id="loginError" class="auth-error" aria-live="polite"></div></form></div></div>
+<main class="wrap" id="protectedApp" style="max-width:640px;display:none"><div class="auth-user"><span id="authWho"></span><button type="button" class="ctrl sub" id="logoutBtn">ログアウト</button></div>
+  <h1>司会 <small style="font-size:14px;color:#aaa">v9</small></h1>
   <div id="versionGuard" style="display:none;background:#8b1d1d;color:#fff;border:3px solid #ff6b6b;border-radius:14px;padding:16px;margin:12px 0;font-weight:900;font-size:20px">⚠ 古いシステムを検出しました。回答時間が計測されません。最新版を反映し、このページを再読み込みしてください。</div>
   <div class="card" id="info" aria-live="polite">読込中...</div>
   <div class="hostbtns">
@@ -20,13 +21,24 @@
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=8.2"></script>
+<script src="app.js?v=9"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 8) {
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 9) {
   document.querySelector("#versionGuard").style.display = "block";
   alert("⚠ 古い app.js を検出しました。回答時間が計測されません。最新版を反映してページを再読み込みしてください。");
 }
+const ADMIN_UID = C.roles?.adminUid || "", HOST_UID = C.roles?.hostUid || "";
+const auth = firebase.auth();
+const loginView = document.querySelector("#loginView"), protectedApp = document.querySelector("#protectedApp"), loginError = document.querySelector("#loginError");
+document.querySelector("#loginForm").addEventListener("submit", async e => { e.preventDefault(); loginError.textContent=""; try { await auth.signInWithEmailAndPassword(document.querySelector("#loginId").value.trim(), document.querySelector("#loginPw").value); } catch(err) { loginError.textContent="IDまたはパスワードが違います。"; } });
+document.querySelector("#logoutBtn").addEventListener("click", () => auth.signOut());
+auth.onAuthStateChanged(async user => {
+  if (!user) { loginView.style.display="block"; protectedApp.style.display="none"; return; }
+  if (user.uid !== HOST_UID && user.uid !== ADMIN_UID) { loginError.textContent="このアカウントには司会権限がありません。"; await auth.signOut(); return; }
+  document.querySelector("#authWho").textContent = user.email || "Host"; loginView.style.display="none"; protectedApp.style.display="block";
+});
 const $ = s => document.querySelector(s);
 let G = defaults;
 function render(g) {

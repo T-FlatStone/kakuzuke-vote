@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=8.2">
+<link rel="stylesheet" href="style.css?v=9">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -14,9 +14,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=8.2"></script>
+<script src="app.js?v=9"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 8) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 9) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
 let G = defaults, busy = false;
 
@@ -87,10 +87,13 @@ function render(g) {
 }
 
 function tick(g) {
-  const el = document.querySelector("#tm"); if (!el) return;
-  const r = remainingSec(g); el.className = "vote-timer";
+  const el = document.querySelector("#tm");
+  if (!el) return;
+  const r = remainingSec(g);
+  el.className = "vote-timer";
   if (r == null) { el.textContent = ""; return; }
-  if (r <= 5) el.classList.add("danger5"); else if (r <= 10) el.classList.add("warn10");
+  if (r <= 5) el.classList.add("danger5");
+  else if (r <= 10) el.classList.add("warn10");
   el.textContent = "残り " + r + " 秒";
 }
 watchAll(render, tick);

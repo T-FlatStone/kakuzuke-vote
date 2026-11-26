@@ -1,11 +1,12 @@
-# kakuzuke-vote v8
+# kakuzuke-vote v9
 
-- `vote.html?team=A` ～ : チーム投票画面
-- `screen.html` : プロジェクター用
-- `host.html` : 司会用（v8表示・旧版警告）
-- `admin.html` : 管理用（各チームの今回時間・現在合計を確認可能）
-- `app.js` : 共通処理（APP_VERSION=8）
-- `style.css` : 固定レイアウトの大型カウントダウン
-- 選択肢色：A=赤 / B=緑 / C=黄 / D=青
+## 認証
+- admin.html: Firebase Email/Password。Admin UIDのみ。
+- host.html: Firebase Email/Password。Host UIDまたはAdmin UID。
+- screen.html / vote.html: 認証なし（チームキーは次段階）。
 
-`database.rules.json` は動作確認用です。誰でも読み書きできるため本番前に認証付きルールへ変更してください。
+## 重要
+Firebase Authenticationで Email/Password を有効化してください。database.rules.json を Realtime Database Rules に反映してください。
+現在は投票URLのランダムキー未実装のため votes/confirms の書き込みは一時的に公開しています。
+
+回答色: A=赤 / B=緑 / C=黄 / D=青。スクリーンは4:3固定ステージ。

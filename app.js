@@ -3,7 +3,7 @@ const C = window.KAKUZUKE_CONFIG || {};
 firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -89,7 +89,7 @@ function missingTimes(g) {
 const fmtSec = ms => ms == null ? "-" : (ms / 1000).toFixed(2) + "秒";
 
 
-// 管理画面向け：現在問の計測時間。受付中の未確定は現在まで、締切後は締切まで。
+// 管理画面向け：現在問の計測時間
 function currentTimeMs(g, id) {
   const q = g.current, opened = g.opened?.[q];
   if (!opened) return null;
@@ -98,9 +98,7 @@ function currentTimeMs(g, id) {
   const end = g.closed?.[q] || (phaseOf(g) === "open" ? serverNow() : null);
   return end ? Math.max(0, end - opened) : null;
 }
-function completedTimeCount(g, id) {
-  return Object.keys(g.answers || {}).filter(q => timeMs(g, q, id) != null).length;
-}
+function completedTimeCount(g, id) { return Object.keys(g.answers || {}).filter(q => timeMs(g, q, id) != null).length; }
 function completedQuestionCount(g) { return Object.keys(g.answers || {}).length; }
 
 // ===== 格付け計算 =====
