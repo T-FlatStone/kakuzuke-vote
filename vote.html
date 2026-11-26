@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.1">
+<link rel="stylesheet" href="style.css?v=11.2">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.1"></script>
+<script src="app.js?v=11.2"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
@@ -32,7 +32,7 @@ function render(g) {
     return;
   }
   const ph = phaseOf(g);
-  const mine = localVote || sessionStorage.getItem("kk_"+g.current+"_"+me.id) || "";
+  const mine = sessionStorage.getItem("kk_"+g.current+"_"+me.id) || "";
   const conf = !!g.confirmed?.[me.id];
   const r = SETUP.ranks[g.rankIndexes?.[me.id] ?? 0] || SETUP.ranks[0];
   let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(me.name) + '</h2>' + rankBadge(r) + '</div>';
@@ -72,7 +72,7 @@ function render(g) {
   // 選択（確定前なら何度でも変更可）
   app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
     if (phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
-    const before = localVote || sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
+    const before = sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
     localVote = b.dataset.v;
     sessionStorage.setItem("kk_"+G.current+"_"+me.id, localVote);
     render(G); // private vote変更はpublicGameを更新しないため、手元の選択UIは即座に再描画する
@@ -87,7 +87,7 @@ function render(g) {
   // 確定（ここで時刻を記録。確定後は変更不可）
   const cb = app.querySelector("#confirm");
   if (cb) cb.addEventListener("click", async () => {
-    const v = localVote || sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
+    const v = sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
     if (busy || !v || phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
     if (!confirm(v + " で確定しますか？\n確定すると変更できません。")) return;
     busy = true; cb.disabled = true;
@@ -127,9 +127,27 @@ function showError(title, e){
   const msg = String(e && (e.code || e.message) || e);
   app.innerHTML='<b>'+title+'</b><p class="muted">段階：'+esc(stage)+'<br>'+esc(msg)+'</p><button type="button" class="confirm" onclick="location.reload()">再読み込み</button>';
 }
+function watchPublic(){
+  let g = null, lastPhase = null;
+  const redraw = () => { if (!g) return; lastPhase = phaseOf(g); safeRender(g); tick(g); };
+  Promise.all([db.ref("publicSetup").once("value"), db.ref("publicGame").once("value")]).then(([s, gs]) => {
+    SETUP = normalizeSetup(s.val());
+    g = { ...defaults, ...(gs.val() || {}) };
+    redraw();
+    stage = "リアルタイム受信";
+    db.ref("publicSetup").on("value", s2 => { SETUP = normalizeSetup(s2.val()); redraw(); }, e => showError("設定の受信が止まりました。", e));
+    db.ref("publicGame").on("value", g2 => { g = { ...defaults, ...(g2.val() || {}) }; redraw(); }, e => showError("進行状況の受信が止まりました。", e));
+    setInterval(() => {
+      if (!g) return;
+      const p = phaseOf(g);
+      if (p !== lastPhase) { lastPhase = p; safeRender(g); }
+      tick(g);
+    }, 250);
+  }).catch(e => showError("画面データを取得できませんでした。", e));
+}
 // 10秒たっても表示できなければ、どこで止まったかを表示
 setTimeout(()=>{ if(!rendered) showError("読み込みに時間がかかっています。", "通信状態を確認してください"); }, 10000);
-authorizeTeam().then(()=>watchAll(safeRender,tick)).catch(e=>{
+authorizeTeam().then(()=>watchPublic()).catch(e=>{
   const denied = /permission/i.test(String(e && (e.code||e.message)||e));
   showError(denied ? "投票URLが無効です。配られたQRコードから開き直してください。" : "接続できませんでした。", e);
 });
