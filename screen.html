@@ -35,26 +35,35 @@ function render(g) {
     return;
   }
 
-  // 最終結果は公開済みの集計結果だけを使用
+  // 最終結果：ここで初めて順位と回答時間の合計を表示（4位→1位の順に登場）
   if (ph === "final") {
-    if (finalShown) return; finalShown=true;
-    db.ref("publicResults").once("value").then(snap=>{
-      const rr=snap.val()||{}, best=toArr(rr.best), groups=toArr(rr.groups);
-      head.innerHTML='<div class="big gold">最終結果発表</div><p class="center muted">同じ格付けなら、回答時間の合計が短いチームが上位</p>';
-      body.innerHTML='<div class="best">'+best.map((x,i)=>'<div class="place'+(x.place===1?' p1':'')+'" style="animation-delay:'+(1+i*2.5)+'s"><span class="no">'+x.place+'位</span><span class="nm">'+esc(x.name)+'</span>'+rankBadge(x.rank)+'<span class="sec">合計 '+fmtSec(x.ms)+'</span></div>').join('')+'</div><h2 class="gold">全チームの格付け</h2><div class="rankgrid">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(gr.rank.name)+'（'+gr.names.length+'）</h3>'+gr.names.map(n=>'<span class="t">'+esc(n)+'</span>').join('')+'</div>').join('')+'</div>';
-    }); return;
+    if (finalShown) return;
+    finalShown = true;
+    const best = standings(g).filter(x => x.place <= BEST_N);
+    const maxPlace = Math.max(...best.map(x => x.place), 1);
+    head.innerHTML = '<div class="big gold">最終結果発表</div><p class="center muted">同じ格付けなら、回答時間の合計が短いチームが上位</p>';
+    body.innerHTML = '<div class="best">' + best.map(x => {
+        const delay = 1 + (maxPlace - x.place) * 2.5;   // 4位から順に2.5秒間隔
+        return '<div class="place' + (x.place === 1 ? ' p1' : '') + '" style="animation-delay:' + delay + 's">' +
+          '<span class="no">' + x.place + '位</span><span class="nm">' + esc(x.team.name) + '</span>' +
+          rankBadge(SETUP.ranks[x.ri]) + '<span class="sec">合計 ' + fmtSec(x.ms) + '</span></div>';
+      }).join("") + '</div>' +
+      '<h2 class="gold">全チームの格付け</h2><div class="rankgrid">' + rankGroups(g).map(gr =>
+        '<div class="rankbox" style="' + rankStyle(gr.rank) + '"><h3>' + esc(gr.rank.name) + '（' + gr.teams.length + '）</h3>' +
+        gr.teams.map(t => '<span class="t">' + esc(t.name) + '</span>').join("") + '</div>').join("") + '</div>';
+    return;
   }
 
   let statusHtml;
-  if (ph === "open") statusHtml = '<div class="screen-statusline open-state"><div class="screen-center-open"><div class="screen-timer-slot"><div class="screen-timer" id="tm"></div></div></div><div class="screen-confirmed">' + Object.keys(g.confirmed || {}).length + ' / ' + SETUP.teams.length + ' チーム回答済み</div></div>';
+  if (ph === "open") statusHtml = '<div class="screen-statusline open-state"><div class="screen-center-open"><div class="screen-timer-slot"><div class="screen-timer" id="tm"></div></div></div><div class="screen-confirmed">' + countConfirmed(g) + ' / ' + SETUP.teams.length + ' チーム回答済み</div></div>';
   else if (ph === "closed") statusHtml = '<div class="screen-statusline closed-state"><div class="screen-status-main">締切！</div></div>';
   else if (ph === "answer") statusHtml = '<div class="screen-statusline answer-state"><div class="screen-status-main"><span class="gold">正解は ' + esc(g.answer) + '！</span></div></div>';
   else statusHtml = '<div class="screen-statusline pre"><div class="screen-status-main">まもなく回答開始</div></div>';
   head.innerHTML = '<div class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</div><h2>' + esc(g.question) + '</h2>' + statusHtml;
   body.innerHTML = '<div class="teams">' + SETUP.teams.map(t => {
-    const v = g.revealedVotes?.[t.id] || "";
-    const conf = !!g.confirmed?.[t.id];
-    const r = SETUP.ranks[g.rankIndexes?.[t.id] ?? 0] || SETUP.ranks[0];
+    const v = voteOf(g, g.current, t.id);
+    const conf = confirmOf(g, g.current, t.id);
+    const r = rankOf(g, t.id);
     let cls = "team", txt, style;
     if (ph === "answer") {
       const ok = v === g.answer, d = dropOf(g, t.id);

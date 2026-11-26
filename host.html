@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script>window.KAKUZUKE_PRIVATE = true;</script>
+<script>window.KAKUZUKE_PRIVATE_SETUP = true;</script>
 <script src="app.js?v=11"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) {
@@ -39,12 +39,10 @@ auth.onAuthStateChanged(async user => {
   if (!user) { loginView.style.display="block"; protectedApp.style.display="none"; return; }
   if (user.uid !== HOST_UID && user.uid !== ADMIN_UID) { loginError.textContent="このアカウントには司会権限がありません。"; await auth.signOut(); return; }
   document.querySelector("#authWho").textContent = user.email || "Host"; loginView.style.display="none"; protectedApp.style.display="block";
-  if (!window.__hostStarted) { window.__hostStarted=true; watchAll(render, tick); }
 });
 const $ = s => document.querySelector(s);
 let G = defaults;
 function render(g) {
-  syncPublic(g);
   G = g;
   const ph = phaseOf(g);
   const n = SETUP.questions.length;
@@ -79,7 +77,7 @@ function tick(g) {
 $("#bStart").addEventListener("click", () => { if (phaseOf(G) === "open") Ops.close(G); else Ops.start(G); });
 $("#bAnswer").addEventListener("click", () => { const ans = SETUP.questions[G.current - 1]?.answer; if (ans && !confirm("正解「" + ans + "」を発表しますか？")) return; Ops.reveal(G); });
 $("#bNext").addEventListener("click", () => { if (G.current >= SETUP.questions.length) { if (confirm("最終結果を発表しますか？")) Ops.final(); } else Ops.goto(G.current + 1); });
-// 認証成功後に開始
+watchAll(render, tick);
 </script>
 </body>
 </html>
