@@ -3,7 +3,7 @@ const C = window.KAKUZUKE_CONFIG || {};
 firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -161,7 +161,8 @@ function watchAll(onChange, onTick) {
     onChange(g);
     if (onTick) onTick(g);
   };
-  db.ref("setup").on("value", s => { SETUP = normalizeSetup(s.val()); haveSetup = true; fire(); });
+  const setupPath = window.KAKUZUKE_PRIVATE_SETUP ? "setup" : "publicSetup";
+  db.ref(setupPath).on("value", s => { SETUP = normalizeSetup(s.val()); haveSetup = true; fire(); });
   db.ref("game").on("value", s => { g = { ...defaults, ...(s.val() || {}) }; haveGame = true; fire(); });
   setInterval(() => {
     if (!haveGame || !haveSetup) return;

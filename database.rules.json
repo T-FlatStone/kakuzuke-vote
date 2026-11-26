@@ -1,8 +1,26 @@
 {
   "rules": {
-    ".read": true,
-    "setup": { ".write": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'" },
+    ".read": false,
+    "publicSetup": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'"
+    },
+    "setup": {
+      ".read": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')",
+      ".write": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'"
+    },
+    "teamKeys": {
+      ".read": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'",
+      ".write": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'"
+    },
+    "teamSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && newData.child('team').isString() && newData.child('key').isString() && newData.child('key').val() === root.child('teamKeys').child(newData.child('team').val()).val()"
+      }
+    },
     "game": {
+      ".read": true,
       ".write": "auth != null && auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42'",
       "phase": { ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')" },
       "current": { ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')" },
@@ -15,8 +33,22 @@
       "closed": { ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')" },
       "answers": { ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')" },
       "penalties": { ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || auth.uid === '2IWnSAE2UhPeE0epYNrKXDwnmH23')" },
-      "votes": { ".write": true },
-      "confirms": { ".write": true }
+      "votes": {
+        "$q": {
+          "$team": {
+            ".write": "auth != null && (auth.uid === 'omioogIDRwgDg2EN6LSaAMW7YN42' || (root.child('teamSessions').child(auth.uid).child('team').val() === $team && root.child('game/phase').val() === 'open'))",
+            ".validate": "newData.isString() && (newData.val() === 'A' || newData.val() === 'B' || newData.val() === 'C' || newData.val() === 'D')"
+          }
+        }
+      },
+      "confirms": {
+        "$q": {
+          "$team": {
+            ".write": "auth != null && !data.exists() && root.child('teamSessions').child(auth.uid).child('team').val() === $team && root.child('game/phase').val() === 'open'",
+            ".validate": "newData.hasChildren(['c','at']) && newData.child('c').isString() && newData.child('c').val() === root.child('game/votes').child($q).child($team).val() && newData.child('at').isNumber()"
+          }
+        }
+      }
     }
   }
 }

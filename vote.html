@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -13,10 +13,11 @@
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 <script>
-if (typeof APP_VERSION === "undefined" || APP_VERSION < 10) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
+if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
 const teamKeyParam = (new URLSearchParams(location.search).get("key") || "").trim();
 let G = defaults, busy = false;
@@ -97,7 +98,17 @@ function tick(g) {
   else if (r <= 10) el.classList.add("warn10");
   el.textContent = "残り " + r + " 秒";
 }
-watchAll(render, tick);
+async function authorizeTeam() {
+  // team/tokenの照合はRealtime Database Rules側で強制する。
+  if (!teamParam || !teamKeyParam) throw new Error("missing-team-key");
+  let user = firebase.auth().currentUser;
+  if (!user) user = (await firebase.auth().signInAnonymously()).user;
+  await db.ref("teamSessions/" + user.uid).set({ team: teamParam, key: teamKeyParam });
+}
+authorizeTeam().then(() => watchAll(render, tick)).catch(err => {
+  console.error(err);
+  app.innerHTML = '<b>投票URLが無効です。</b><p>配られたQRコードから開き直してください。</p>';
+});
 </script>
 </body>
 </html>
