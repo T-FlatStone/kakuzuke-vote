@@ -94,3 +94,32 @@ body.screen-page .team .badge{font-size:clamp(10px,1.5vh,15px);padding:2px 8px}
 .vote-timer{height:40px;line-height:40px;font-size:32px;min-width:180px;font-weight:900;text-align:center;color:#ff7a7a;font-variant-numeric:tabular-nums}
 .vote-timer.warn10{color:#f4d13d}.vote-timer.danger5{color:#ff5a5a;text-shadow:0 0 12px #ff5a5a88}
 @media(max-height:700px){body.screen-page #head{height:180px}.screen-statusline{height:80px;min-height:80px}.screen-timer-slot{height:72px;min-height:72px}.screen-timer{height:72px;line-height:72px;font-size:58px}.screen-timer.closed{font-size:42px}}
+
+
+/* ===== v8.2: 4:3ステージ + 状態別中央配置 ===== */
+body.screen-page{height:100vh;overflow:hidden;background:#09090f;display:flex;align-items:center;justify-content:center}
+body.screen-page .wrap{
+  width:min(100vw,calc(100vh * 4 / 3));
+  height:min(100vh,calc(100vw * 3 / 4));
+  max-width:none;margin:0;padding:clamp(12px,1.8vh,22px);
+  display:grid;grid-template-rows:clamp(190px,27%,250px) minmax(0,1fr);gap:clamp(8px,1.2vh,14px);
+  background:radial-gradient(circle at top,#332742,#101018 60%);
+  overflow:hidden;
+}
+body.screen-page #head{height:100%;margin:0;display:flex;flex-direction:column;justify-content:center;text-align:center;overflow:hidden}
+body.screen-page #head .muted{text-align:center}
+body.screen-page #head h2{text-align:center;margin:8px 0;font-size:clamp(25px,3.8vh,44px);line-height:1.12}
+body.screen-page #body>.teams{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));height:100%}
+/* 回答前・締切・正解発表：全部中央 */
+.screen-statusline{position:relative;height:104px;min-height:104px;display:flex;align-items:center;justify-content:center;width:100%}
+.screen-status-main{width:100%;padding:0 310px 0 0;font-size:clamp(30px,4.7vh,50px);line-height:1.05;font-weight:900;text-align:center}
+.screen-statusline.pre .screen-status-main,.screen-statusline.closed-state .screen-status-main,.screen-statusline.answer-state .screen-status-main{padding:0}
+/* 回答中：問題・残り時間は中央。回答済み数だけ右端に重ねる */
+.screen-timer-slot{width:300px;height:92px;display:flex;align-items:center;justify-content:center;flex:0 0 300px}
+.screen-timer{width:300px;height:92px;line-height:92px;text-align:center;font-size:clamp(60px,9vh,84px);font-variant-numeric:tabular-nums;font-weight:900}
+.screen-confirmed{position:absolute;right:0;top:50%;transform:translateY(-50%);width:290px;text-align:right;font-size:clamp(18px,2.5vh,28px);font-weight:900;color:#ddd}
+.screen-center-open{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.screen-center-open .screen-timer-slot{margin:auto}
+.screen-statusline.closed-state .screen-timer-slot,.screen-statusline.answer-state .screen-timer-slot,.screen-statusline.pre .screen-timer-slot{display:none}
+@media(max-aspect-ratio:4/3){body.screen-page .wrap{width:100vw;height:75vw}}
+@media(min-aspect-ratio:4/3){body.screen-page .wrap{width:133.333vh;height:100vh}}
