@@ -153,23 +153,51 @@ const rankStyle = r => "background:" + r.color + ";color:" + textColor(r.color);
 const rankBadge = (r, cls) => '<span class="badge ' + (cls || "") + '" style="' + rankStyle(r) + '">' + esc(r.name) + "</span>";
 
 // ===== 監視 =====
-function watchAll(onChange, onTick) {
+function watchAll(onChange, onTick, onError) {
   let g = { ...defaults }, lastPhase = null, haveGame = false, haveSetup = false;
+  let stopped = false;
+  const setupPath = window.KAKUZUKE_PRIVATE ? "setup" : "publicSetup";
+  const gamePath = window.KAKUZUKE_PRIVATE ? "game" : "publicGame";
+  const fail = (where, e) => { console.error(where, e); if (onError) onError(where, e); };
   const fire = () => {
-    if (!haveGame || !haveSetup) return;
-    lastPhase = phaseOf(g);
-    onChange(g);
-    if (onTick) onTick(g);
+    if (stopped || !haveGame || !haveSetup) return;
+    lastPhase = phaseOf(g); onChange(g); if (onTick) onTick(g);
   };
-  const setupPath = window.KAKUZUKE_PRIVATE_SETUP ? "setup" : "publicSetup";
-  db.ref(setupPath).on("value", s => { SETUP = normalizeSetup(s.val()); haveSetup = true; fire(); });
-  db.ref("game").on("value", s => { g = { ...defaults, ...(s.val() || {}) }; haveGame = true; fire(); });
-  setInterval(() => {
+  // 初回をonceで確実に取得してから描画。その後リアルタイム監視へ移行。
+  Promise.all([db.ref(setupPath).once("value"), db.ref(gamePath).once("value")]).then(([ss, gs]) => {
+    SETUP = normalizeSetup(ss.val()); haveSetup = true;
+    g = { ...defaults, ...(gs.val() || {}) }; haveGame = true;
+    fire();
+    db.ref(setupPath).on("value", x => { SETUP = normalizeSetup(x.val()); haveSetup = true; fire(); }, e => fail(setupPath, e));
+    db.ref(gamePath).on("value", x => { g = { ...defaults, ...(x.val() || {}) }; haveGame = true; fire(); }, e => fail(gamePath, e));
+  }).catch(e => fail("initial-load", e));
+  const timer = setInterval(() => {
     if (!haveGame || !haveSetup) return;
-    const p = phaseOf(g);
-    if (p !== lastPhase) { lastPhase = p; onChange(g); }
+    const p = phaseOf(g); if (p !== lastPhase) { lastPhase = p; onChange(g); }
     if (onTick) onTick(g);
   }, 250);
+  return () => { stopped = true; clearInterval(timer); };
+}
+
+// Admin/Hostだけが非公開gameから、表示に必要な安全なデータへ同期する。
+function publicGameFrom(g) {
+  const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
+  SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
+  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks};
+  if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
+  if(ph==="answer") out.answer=g.answer||null;
+  return out;
+}
+function publicResultsFrom(g) {
+  const best=standings(g).filter(x=>x.place<=BEST_N).map(x=>({place:x.place,name:x.team.name,rank:SETUP.ranks[x.ri],ms:x.ms}));
+  const groups=rankGroups(g).map(gr=>({rank:gr.rank,names:gr.teams.map(t=>t.name)}));
+  return {best,groups};
+}
+let lastPublic="";
+function syncPublic(g){
+  if(!window.KAKUZUKE_PRIVATE)return;
+  const o=publicGameFrom(g), j=JSON.stringify(o); if(j!==lastPublic){lastPublic=j;db.ref("publicGame").set(o).catch(console.error);}
+  if(phaseOf(g)==="final") db.ref("publicResults").set(publicResultsFrom(g)).catch(console.error);
 }
 
 // ===== 以下は司会・管理画面用 =====

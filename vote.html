@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.2">
+<link rel="stylesheet" href="style.css?v=11.3">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.2"></script>
+<script src="app.js?v=11.3"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
@@ -127,27 +127,10 @@ function showError(title, e){
   const msg = String(e && (e.code || e.message) || e);
   app.innerHTML='<b>'+title+'</b><p class="muted">段階：'+esc(stage)+'<br>'+esc(msg)+'</p><button type="button" class="confirm" onclick="location.reload()">再読み込み</button>';
 }
-function watchPublic(){
-  let g = null, lastPhase = null;
-  const redraw = () => { if (!g) return; lastPhase = phaseOf(g); safeRender(g); tick(g); };
-  Promise.all([db.ref("publicSetup").once("value"), db.ref("publicGame").once("value")]).then(([s, gs]) => {
-    SETUP = normalizeSetup(s.val());
-    g = { ...defaults, ...(gs.val() || {}) };
-    redraw();
-    stage = "リアルタイム受信";
-    db.ref("publicSetup").on("value", s2 => { SETUP = normalizeSetup(s2.val()); redraw(); }, e => showError("設定の受信が止まりました。", e));
-    db.ref("publicGame").on("value", g2 => { g = { ...defaults, ...(g2.val() || {}) }; redraw(); }, e => showError("進行状況の受信が止まりました。", e));
-    setInterval(() => {
-      if (!g) return;
-      const p = phaseOf(g);
-      if (p !== lastPhase) { lastPhase = p; safeRender(g); }
-      tick(g);
-    }, 250);
-  }).catch(e => showError("画面データを取得できませんでした。", e));
-}
+
 // 10秒たっても表示できなければ、どこで止まったかを表示
 setTimeout(()=>{ if(!rendered) showError("読み込みに時間がかかっています。", "通信状態を確認してください"); }, 10000);
-authorizeTeam().then(()=>watchPublic()).catch(e=>{
+authorizeTeam().then(()=>watchAll(safeRender, tick, (w,e)=>showError("画面データを取得できませんでした。", w+" / "+(e.code||e.message||e)))).catch(e=>{
   const denied = /permission/i.test(String(e && (e.code||e.message)||e));
   showError(denied ? "投票URLが無効です。配られたQRコードから開き直してください。" : "接続できませんでした。", e);
 });

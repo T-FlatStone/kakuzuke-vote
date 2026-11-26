@@ -1,17 +1,18 @@
-# kakuzuke-vote v11
+# kakuzuke-vote v11 (rebuild 11.3)
 
-## v11 セキュリティ
-- admin.html: Email/Password + Admin UID
-- host.html: Email/Password + Host/Admin UID
-- vote.html: Anonymous Authentication + チーム別128bitキー
-- Realtime Database Rulesで、チームは自チームにだけ、回答受付中だけ書き込み可能
-- setup/teamKeys は非公開。screen/vote は publicSetup のみ読み込み
+全画面を同一ビルドとして再構成。HTMLは app.js/style.css の `?v=11.3` を参照し、キャッシュ混在を防止。
 
-## v10からの移行手順（順番重要）
-1. Firebase Authentication > Sign-in method で Anonymous（匿名）を有効化。
-2. GitHubへv11の全ファイルを上書き。
-3. Realtime Database Rulesへ同梱の database.rules.json を反映。
-4. admin.htmlへ管理者ログイン。既存設定が読み込まれたら「保存」を1回押す。これで publicSetup と teamKeys が作成される。
-5. 管理画面のキー付きURLでAチームを1台テスト。
+- Admin/Host: Email/Password認証後のみ private setup/game を購読
+- Admin/Host: private game → publicGame/publicResults を同期
+- Vote: Anonymous Auth + team/keyをRulesで照合後、publicSetup/publicGameを購読
+- Screen: publicSetup/publicGame/publicResultsのみ
+- 投票受付中は他チームのA/B/C/Dを公開しない。締切後にrevealedVotesを公開
+- A=赤 / B=緑 / C=黄 / D=青
 
-JSONにはteam keyも含まれるため、JSONファイルはGitHubへコミットしないこと。
+## 更新
+1. GitHubをZIP内9ファイルで全上書き
+2. Firebase Authentication: Email/Password と Anonymous を有効化
+3. Realtime Database Rulesへ同梱database.rules.jsonを反映
+4. Adminログイン → 保存を1回押す
+5. Hostログイン → 第1問へ → 回答開始
+6. Aチームの最新キー付きURLで確認
