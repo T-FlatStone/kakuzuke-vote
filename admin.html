@@ -98,7 +98,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script>window.KAKUZUKE_PRIVATE_SETUP = true;</script>
+<script>window.KAKUZUKE_PRIVATE = true;</script>
 <script src="app.js?v=11"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
@@ -111,6 +111,7 @@ auth.onAuthStateChanged(async user => {
   if (!user) { loginView.style.display="block"; protectedApp.style.display="none"; return; }
   if (user.uid !== ADMIN_UID) { loginError.textContent="このアカウントには管理者権限がありません。"; await auth.signOut(); return; }
   document.querySelector("#authWho").textContent = user.email || "Admin"; loginView.style.display="none"; protectedApp.style.display="block";
+  if (!window.__adminStarted) { window.__adminStarted=true; loadSetup(); watchAll(renderGame, tick); }
 });
 const $ = s => document.querySelector(s);
 let G = defaults;
@@ -282,13 +283,8 @@ $("#saveSetup").addEventListener("click", async () => {
   try {
     await Promise.all([
       db.ref("setup").set({ questions, timerSec, teams, ranks }),
-      db.ref("publicSetup").set({
-        timerSec,
-        teams: teams.map(t => ({ id: t.id, name: t.name })),
-        ranks,
-        questions: questions.map(q => ({ text: q.text, n: q.n, penalty: q.penalty }))
-      }),
-      db.ref("teamKeys").set(Object.fromEntries(teams.map(t => [t.id, t.key])))
+      db.ref("publicSetup").set({ timerSec, teams:teams.map(t=>({id:t.id,name:t.name})), ranks, questions:questions.map(q=>({text:q.text,n:q.n,penalty:q.penalty})) }),
+      db.ref("teamKeys").set(Object.fromEntries(teams.map(t=>[t.id,t.key])))
     ]);
     await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: questions.length });
     fillEditor({ questions, timerSec, teams, ranks });
@@ -329,6 +325,7 @@ window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); 
 
 // ---------- 進行 ----------
 function renderGame(g) {
+  syncPublic(g);
   G = g;
   const ph = phaseOf(g);
   const q = SETUP.questions[g.current - 1];
@@ -388,8 +385,7 @@ $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発�
 $("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答・確定・正解を消して、やり直しますか？")) Ops.redo(G); });
 $("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付け・回答時間を消去して最初に戻します。よろしいですか？\n（登録した問題・チーム・ランクは消えません）")) Ops.resetAll(G); });
 
-loadSetup();
-watchAll(renderGame, tick);
+// 認証成功後に開始
 </script>
 </body>
 </html>
