@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=8.1">
 <title>格付けチェック スクリーン</title>
 </head>
-<body>
+<body class="screen-page">
 <main class="wrap">
   <h1 id="title">格付けチェック</h1>
   <div id="head" class="card"></div>
@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=8.1"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 8) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;   // 最終結果のアニメーションを1回だけ再生するため
@@ -54,16 +54,19 @@ function render(g) {
     return;
   }
 
-  // 問題表示〜正解発表（回答時間は出さない）
-  let status;
-  if (ph === "answer") status = '<div class="big gold">正解は ' + esc(g.answer) + '！</div>';
-  else if (ph === "closed") status = '<div class="big">締切！</div>';
-  else if (ph === "open") status = '<div class="big">' + countConfirmed(g) + ' / ' + SETUP.teams.length + ' チーム回答済み</div><div class="timer huge" id="tm"></div>';
-  else status = '<div class="big" style="font-size:32px">まもなく回答開始</div>';
-
+  // 問題表示〜正解発表。タイマー領域は表示前から固定してカード位置を絶対に動かさない
+  let statusMain;
+  if (ph === "answer") statusMain = '<span class="gold">正解は ' + esc(g.answer) + '！</span>';
+  else if (ph === "closed") statusMain = '締切！';
+  else if (ph === "open") statusMain = countConfirmed(g) + ' / ' + SETUP.teams.length + ' チーム回答済み';
+  else statusMain = 'まもなく回答開始';
+  const timerInitial = ph === "closed" ? '締切！' : '';
   head.innerHTML = '<div class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</div>' +
-    '<h2>' + esc(g.question) + '</h2>' + status;
-
+    '<h2>' + esc(g.question) + '</h2>' +
+    '<div class="screen-statusline">' +
+      '<div class="screen-status-main">' + statusMain + '</div>' +
+      '<div class="screen-timer-slot"><div class="screen-timer' + (ph === "closed" ? ' closed' : '') + '" id="tm">' + timerInitial + '</div></div>' +
+    '</div>';
   body.innerHTML = '<div class="teams">' + SETUP.teams.map(t => {
     const v = voteOf(g, g.current, t.id);
     const conf = confirmOf(g, g.current, t.id);
@@ -86,12 +89,14 @@ function render(g) {
 }
 
 function tick(g) {
-  const el = document.querySelector("#tm");
-  if (!el) return;
-  const r = remainingSec(g);
-  el.textContent = r == null ? "" : r + " 秒";
+  const el = document.querySelector("#tm"); if (!el) return;
+  const ph = phaseOf(g), r = remainingSec(g);
+  el.className = "screen-timer";
+  if (ph === "closed") { el.classList.add("closed"); el.textContent = "締切！"; return; }
+  if (ph !== "open" || r == null) { el.textContent = ""; return; }
+  if (r <= 5) el.classList.add("danger5"); else if (r <= 10) el.classList.add("warn10");
+  el.textContent = r + " 秒";
 }
-
 watchAll(render, tick);
 </script>
 </body>
