@@ -227,11 +227,20 @@ function publicResultsFrom(g) {
   const groups=rankGroups(g).map(gr=>({rank:gr.rank,names:gr.teams.map(t=>t.name)}));
   return {best,groups};
 }
-let lastPublic="";
+let lastPublic="", publicSyncTimer=null, pendingPublicGame=null, publicSyncSeq=0;
 function syncPublic(g){
   if(!window.KAKUZUKE_PRIVATE)return;
-  const o=publicGameFrom(g), j=JSON.stringify(o); if(j!==lastPublic){lastPublic=j;db.ref("publicGame").set(o).catch(console.error);}
-  if(phaseOf(g)==="final") db.ref("publicResults").set(publicResultsFrom(g)).catch(console.error);
+  pendingPublicGame=JSON.parse(JSON.stringify(g));
+  const seq=++publicSyncSeq;
+  clearTimeout(publicSyncTimer);
+  publicSyncTimer=setTimeout(async()=>{
+    if(seq!==publicSyncSeq||!pendingPublicGame)return;
+    const latest=pendingPublicGame,o=publicGameFrom(latest),j=JSON.stringify(o);
+    try{
+      if(j!==lastPublic){await db.ref("publicGame").set(o);lastPublic=j;}
+      if(phaseOf(latest)==="final")await db.ref("publicResults").set(publicResultsFrom(latest));
+    }catch(e){console.error("public sync",e);}
+  },120);
 }
 
 // ===== 以下は司会・管理画面用 =====

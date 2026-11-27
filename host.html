@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.17">
+<link rel="stylesheet" href="style.css?v=11.18">
 <title>司会</title>
 </head>
 <body>
 <div id="loginView" class="auth-shell"><div class="auth-card"><h1>司会ログイン</h1><form id="loginForm"><label for="loginId">ID（メールアドレス）</label><input id="loginId" type="email" autocomplete="username" required><label for="loginPw">パスワード</label><input id="loginPw" type="password" autocomplete="current-password" required><button class="ctrl" type="submit">ログイン</button><div id="loginError" class="auth-error" aria-live="polite"></div></form></div></div>
 <main class="wrap" id="protectedApp" style="max-width:640px;display:none"><div class="auth-user"><span id="authWho"></span><button type="button" class="ctrl sub" id="logoutBtn">ログアウト</button></div>
-  <h1>司会 <small style="font-size:14px;color:#aaa">v11.17</small></h1>
+  <h1>司会 <small style="font-size:14px;color:#aaa">v11.18</small></h1>
   <div id="versionGuard" style="display:none;background:#8b1d1d;color:#fff;border:3px solid #ff6b6b;border-radius:14px;padding:16px;margin:12px 0;font-weight:900;font-size:20px">⚠ 古いシステムを検出しました。回答時間が計測されません。最新版を反映し、このページを再読み込みしてください。</div>
   <div class="card" id="info" aria-live="polite">読込中...</div>
   <div class="hostbtns">
@@ -25,7 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.17"></script>
+<script src="app.js?v=11.18"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) {
   document.querySelector("#versionGuard").style.display = "block";
@@ -81,7 +81,7 @@ function tick(g) {
   const el = $("#tm"); if (!el) return;
   const r = remainingSec(g); el.textContent = r == null ? "" : "残り " + r + " 秒";
 }
-$("#bIntro").addEventListener("click",async()=>{if(introBusy)return;introBusy=true;const b=$("#bIntro"),old=b.textContent;b.disabled=true;b.textContent="画像切替中…";try{const ph=phaseOf(G),n=SETUP.introSlides.length;if(ph==="lobby"){if(n)await Ops.introStart();else await Ops.goto(1);}else if(ph==="intro"){if((G.introIndex||0)<n-1)await Ops.introNext(G);else await Ops.goto(1);}}catch(e){console.error("intro transition",e);/* 一部の子パス書込みが冪等拒否されてもDB監視の状態を優先し、誤ったalertは出さない */}finally{setTimeout(()=>{introBusy=false;b.textContent=old;},400);}});
+$("#bIntro").addEventListener("click",async()=>{if(introBusy)return;introBusy=true;const b=$("#bIntro"),old=b.textContent;b.disabled=true;b.textContent="画像切替中…";try{const ph=phaseOf(G),n=SETUP.introSlides.length;if(ph==="lobby"){if(n)await Ops.introStart();else await Ops.goto(1);}else if(ph==="intro"){if((G.introIndex||0)<n-1)await Ops.introNext(G);else await Ops.goto(1);}}catch(e){console.error("intro transition",e);/* 一部の子パス書込みが冪等拒否されてもDB監視の状態を優先し、誤ったalertは出さない */}finally{setTimeout(()=>{introBusy=false;},400);}});
 $("#bStart").addEventListener("click", () => { if (phaseOf(G) === "open") Ops.close(G); else Ops.start(G); });
 $("#bAnswer").addEventListener("click", () => { const ans = SETUP.questions[G.current - 1]?.answer; if (ans && !confirm("正解「" + ans + "」を発表しますか？")) return; Ops.reveal(G); });
 $("#bNext").addEventListener("click", () => { const ph=phaseOf(G); if(ph==="rankboard"){ if(confirm("最終結果を発表しますか？"))Ops.final(); } else if(ph==="intro"||ph==="lobby") Ops.goto(1); else if (G.current >= SETUP.questions.length) Ops.rankboard(); else Ops.goto(G.current + 1); });
