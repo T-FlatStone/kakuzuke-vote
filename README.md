@@ -1,12 +1,20 @@
-# kakuzuke-vote v11 final (build 11.5)
+# kakuzuke-vote v11 (rebuild 11.3)
 
-現在のGitHub 9ファイルを基準に整合性を取り直した版。
+全画面を同一ビルドとして再構成。HTMLは app.js/style.css の `?v=11.3` を参照し、キャッシュ混在を防止。
 
-- Admin/Host: Email/Password認証
-- Vote: Anonymous Auth + team/key。匿名認証はVoteページ内メモリのみ
-- Screen/Vote: publicSetup/publicGameのみ
-- 受付中の回答内容は非公開、締切後に公開
-- 最終結果はpublicResults。空ランクでも描画停止しない。生成遅延は最大4秒再取得
-- ベスト4は4位側から1位へ表示
+- Admin/Host: Email/Password認証後のみ private setup/game を購読
+- Admin/Host: private game → publicGame/publicResults を同期
+- Vote: Anonymous Auth + team/keyをRulesで照合後、publicSetup/publicGameを購読
+- Screen: publicSetup/publicGame/publicResultsのみ
+- 投票受付中は他チームのA/B/C/Dを公開しない。締切後にrevealedVotesを公開
 - A=赤 / B=緑 / C=黄 / D=青
-- 全HTMLが app.js/style.css ?v=11.5 を参照
+
+## 更新
+1. GitHubをZIP内9ファイルで全上書き
+2. Firebase Authentication: Email/Password と Anonymous を有効化
+3. Realtime Database Rulesへ同梱database.rules.jsonを反映
+4. Adminログイン → 保存を1回押す
+5. Hostログイン → 第1問へ → 回答開始
+6. Aチームの最新キー付きURLで確認
+
+- v11.6: 正解カード白枠を内側描画へ変更。画面端で切れない。
