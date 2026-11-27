@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.7">
+<link rel="stylesheet" href="style.css?v=11.8">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -15,101 +15,39 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.7"></script>
+<script src="app.js?v=11.8"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
 const teamKeyParam = (new URLSearchParams(location.search).get("key") || "").trim();
 let G = defaults, busy = false, localVote = "", rendered = false, stage = "匿名認証";
+const TXT={
+ ja:{wait:"まもなく開始します",final:"最終格付け",see:"スクリーンの結果発表をご覧ください",closed:"締切",your:"あなたの回答：",none:"未投票",unconfirmed:"（未確定）",correct:"正解",ok:"⭕ 正解！",ng:"❌ 不正解",rankdown:"ランクダウン → ",keep:"ランク維持 ",ready:"回答開始までお待ちください",confirm:"で確定する",select:"選んでから確定",retry:"確定するまで選び直せます。確定までの速さも順位に影響します",done:"で確定しました",remain:"残り ",sec:" 秒"},
+ en:{wait:"Please wait for the game to start",final:"Final Rank",see:"Please watch the final results on the main screen",closed:"Voting Closed",your:"Your answer: ",none:"No answer",unconfirmed:" (not confirmed)",correct:"Correct Answer",ok:"⭕ Correct!",ng:"❌ Incorrect",rankdown:" rank down → ",keep:"Rank maintained ",ready:"Please wait for voting to open",confirm:" - Confirm",select:"Select an answer",retry:"You can change your choice until you confirm. Confirmation speed affects ranking.",done:" confirmed",remain:"Time left ",sec:" sec"}
+};
+
 
 function render(g) {
-  G = g;
-  rendered = true;
-  document.querySelector("#title").textContent = g.title;
-  const me = findTeam(teamParam);
-  if (!me || !teamKeyParam) {
-    app.innerHTML = "<b>投票URLが無効です。</b><p>配られたQRコードから開き直してください。</p>";
-    return;
+  G=g; rendered=true; document.querySelector("#title").textContent=g.title;
+  const me=findTeam(teamParam); if(!me||!teamKeyParam){app.innerHTML="<b>投票URLが無効です。</b><p>配られたQRコードから開き直してください。</p>";return;}
+  const lang=me.language==="en"?"en":"ja",tx=TXT[lang]; document.documentElement.lang=lang;
+  const ph=phaseOf(g), mine=sessionStorage.getItem("kk_"+(g.sessionId||"legacy")+"_"+g.current+"_"+me.id)||"", conf=!!g.confirmed?.[me.id], r=SETUP.ranks[g.rankIndexes?.[me.id]??0]||SETUP.ranks[0];
+  let h='<div class="row" style="justify-content:space-between"><h2 style="margin:0">'+esc(me.name)+'</h2>'+rankBadge(r,"",lang)+'</div>';
+  if(ph==="lobby") h+='<p class="big">'+tx.wait+'</p>';
+  else if(ph==="rankboard"||ph==="final") h+='<p class="muted center">'+tx.final+'</p><div class="center">'+rankBadge(r,"huge",lang)+'</div><p class="center muted">'+tx.see+'</p>';
+  else { h+='<p class="muted">'+(lang==="en"?'Question ':'第')+g.current+(lang==="en"?(g.total?' / '+g.total:''):'問'+(g.total?' / 全'+g.total+'問':''))+'</p><h2>'+esc(g.question)+'</h2>';
+    if(ph==="open"){ h+='<div class="choices">'+g.choices.map(x=>'<button type="button" class="choice'+(mine===x?' selected':'')+'" data-v="'+esc(x)+'"'+(conf?' disabled':'')+'>'+esc(x)+'</button>').join('')+'</div>';
+      if(conf) h+='<div class="done">✔ '+esc(mine)+tx.done+'</div>'; else h+='<button type="button" class="confirm" id="confirm"'+(mine?'':' disabled')+'>'+(mine?esc(mine)+tx.confirm:tx.select)+'</button><p class="muted center">'+tx.retry+'</p>';
+      h+='<div class="vote-timer-slot"><div class="vote-timer" id="tm" aria-live="off"></div></div>';
+    } else if(ph==="closed") h+='<p class="big">'+tx.closed+'</p><p class="center">'+tx.your+'<b class="gold">'+(mine?esc(mine):tx.none)+'</b>'+(mine&&!conf?tx.unconfirmed:'')+'</p>';
+    else if(ph==="answer"){const d=mine===g.answer?0:1;h+='<div class="big gold">'+tx.correct+' '+esc(g.answer)+'</div><p class="big">'+(mine===g.answer?tx.ok:mine?tx.ng:'⏰ '+tx.none)+'</p><p class="center">'+(d>0?d+tx.rankdown:tx.keep)+rankBadge(r,"",lang)+'</p>';}
+    else h+='<p class="big">'+tx.ready+'</p>';
   }
-  const ph = phaseOf(g);
-  const sk = "kk_"+(g.sessionId||"legacy")+"_"+g.current+"_"+me.id;
-    const mine = sessionStorage.getItem(sk) || "";
-  const conf = !!g.confirmed?.[me.id];
-  const r = SETUP.ranks[g.rankIndexes?.[me.id] ?? 0] || SETUP.ranks[0];
-  let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(me.name) + '</h2>' + rankBadge(r) + '</div>';
-
-  if (ph === "lobby") {
-    h += '<p class="big">まもなく開始します</p>';
-  } else if (ph === "final") {
-    // 最終結果発表で初めて回答時間の合計を表示
-    h += '<p class="muted center">最終格付け</p><div class="center">' + rankBadge(r, "huge") + '</div>' +
-      '<p class="center muted">スクリーンの結果発表をご覧ください</p>';
-  } else {
-    h += '<p class="muted">第' + g.current + '問' + (g.total ? ' / 全' + g.total + '問' : '') + '</p><h2>' + esc(g.question) + '</h2>';
-    if (ph === "open") {
-      h += '<div class="choices">' + g.choices.map(x =>
-        '<button type="button" class="choice' + (mine === x ? ' selected' : '') + '" data-v="' + esc(x) + '"' + (conf ? ' disabled' : '') + '>' + esc(x) + '</button>').join("") + '</div>';
-      if (conf) {
-        h += '<div class="done">✔ ' + esc(mine) + ' で確定しました</div>';
-      } else {
-        h += '<button type="button" class="confirm" id="confirm"' + (mine ? '' : ' disabled') + '>' + (mine ? esc(mine) + ' で確定する' : '選んでから確定') + '</button>' +
-          '<p class="muted center">確定するまで選び直せます。確定までの速さも順位に影響します</p>';
-      }
-      h += '<div class="vote-timer-slot"><div class="vote-timer" id="tm" aria-live="off"></div></div>';
-    } else if (ph === "closed") {
-      h += '<p class="big">締切</p><p class="center">あなたの回答：<b class="gold">' + (mine ? esc(mine) : "未投票") + '</b>' +
-        (mine && !conf ? '（未確定）' : '') + '</p>';
-    } else if (ph === "answer") {
-      const d = mine === g.answer ? 0 : 1;
-      h += '<div class="big gold">正解 ' + esc(g.answer) + '</div><p class="big">' +
-        (mine === g.answer ? "⭕ 正解！" : mine ? "❌ 不正解" : "⏰ 未投票") + '</p>' +
-        '<p class="center">' + (d > 0 ? d + 'ランクダウン → ' : 'ランク維持 ') + rankBadge(r) + '</p>';
-    } else {
-      h += '<p class="big">回答開始までお待ちください</p>';
-    }
-  }
-  app.innerHTML = h;
-
-  // 選択（確定前なら何度でも変更可）
-  app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
-    if (phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
-    const before = sessionStorage.getItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id) || "";
-    localVote = b.dataset.v;
-    sessionStorage.setItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id, localVote);
-    render(G); // private vote変更はpublicGameを更新しないため、手元の選択UIは即座に再描画する
-    db.ref("game/votes/" + G.current + "/" + me.id).set(localVote).catch(err => {
-      console.error(err);
-      localVote = before;
-      if (before) sessionStorage.setItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id, before); else sessionStorage.removeItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id);
-      render(G);
-      alert("回答を保存できませんでした。投票URLまたは通信状態を確認してください。");
-    });
-  }));
-  // 確定（ここで時刻を記録。確定後は変更不可）
-  const cb = app.querySelector("#confirm");
-  if (cb) cb.addEventListener("click", async () => {
-    const v = sessionStorage.getItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id) || "";
-    if (busy || !v || phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
-    if (!confirm(v + " で確定しますか？\n確定すると変更できません。")) return;
-    busy = true; cb.disabled = true;
-    try {
-      await db.ref("game/confirms/" + G.current + "/" + me.id).set({ c: v, at: TS });
-    } catch (e) {
-      alert("確定できませんでした。もう一度押してください。");
-    } finally { busy = false; }
-  });
+  app.innerHTML=h;
+  app.querySelectorAll(".choice").forEach(b=>b.addEventListener("click",()=>{if(phaseOf(G)!=="open"||!!G.confirmed?.[me.id])return;const k="kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id,before=sessionStorage.getItem(k)||"";localVote=b.dataset.v;sessionStorage.setItem(k,localVote);render(G);db.ref("game/votes/"+G.current+"/"+me.id).set(localVote).catch(err=>{console.error(err);localVote=before;if(before)sessionStorage.setItem(k,before);else sessionStorage.removeItem(k);render(G);alert(lang==="en"?"Could not save your answer.":"回答を保存できませんでした。投票URLまたは通信状態を確認してください。");});}));
+  const cb=app.querySelector("#confirm"); if(cb)cb.addEventListener("click",async()=>{const k="kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id,v=sessionStorage.getItem(k)||"";if(busy||!v||phaseOf(G)!=="open"||!!G.confirmed?.[me.id])return;if(!confirm(lang==="en"?"Confirm "+v+"? You cannot change it afterward.":v+" で確定しますか？\n確定すると変更できません。"))return;busy=true;cb.disabled=true;try{await db.ref("game/confirms/"+G.current+"/"+me.id).set({c:v,at:TS});}catch(e){alert(lang==="en"?"Could not confirm. Please try again.":"確定できませんでした。もう一度押してください。");}finally{busy=false;}});
 }
-
-function tick(g) {
-  const el = document.querySelector("#tm");
-  if (!el) return;
-  const r = remainingSec(g);
-  el.className = "vote-timer";
-  if (r == null) { el.textContent = ""; return; }
-  if (r <= 5) el.classList.add("danger5");
-  else if (r <= 10) el.classList.add("warn10");
-  el.textContent = "残り " + r + " 秒";
-}
+function tick(g){const el=document.querySelector("#tm");if(!el)return;const r=remainingSec(g),me=findTeam(teamParam),tx=TXT[me?.language==="en"?"en":"ja"];el.className="vote-timer";if(r==null){el.textContent="";return;}if(r<=5)el.classList.add("danger5");else if(r<=10)el.classList.add("warn10");el.textContent=tx.remain+r+tx.sec;}
 async function authorizeTeam(){
   if(!teamParam||!teamKeyParam) throw new Error("URLにteamまたはkeyがありません");
   stage = "匿名認証";

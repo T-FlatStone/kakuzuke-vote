@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.7">
+<link rel="stylesheet" href="style.css?v=11.8">
 <title>管理</title>
 </head>
 <body>
@@ -34,7 +34,7 @@
       <span id="copyMsg" class="muted" aria-live="polite"></span>
     </div>
     <div class="tablewrap"><table style="margin-top:10px">
-      <thead><tr><th>ID</th><th>チーム名（画面に表示）</th><th>キー</th><th>投票URL</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>チーム名（画面に表示）</th><th>言語</th><th>キー</th><th>投票URL</th><th></th></tr></thead>
       <tbody id="trows"></tbody>
     </table></div>
     <p class="muted" style="font-size:13px">IDは投票URLの <code>?team=</code> に使う固定の記号です。チーム名を変えてもURLは変わりません。<br>チーム数を減らすと、末尾のチームから削除されます。</p>
@@ -43,7 +43,7 @@
   <section class="card">
     <h2>ランク（上から順に格下げ）</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>#</th><th>ランク名</th><th>背景色</th><th>見本</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>ランク名（日本語）</th><th>Rank name (English)</th><th>背景色</th><th>見本</th><th></th></tr></thead>
       <tbody id="rrows"></tbody>
     </table></div>
     <div class="row" style="margin-top:10px">
@@ -55,7 +55,7 @@
   <section class="card">
     <h2>問題と正解</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>#</th><th>問題文</th><th>問題画像（任意）</th><th>選択肢</th><th>正解</th><th>失敗時↓</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>問題文</th><th>問題前スライド（複数可）</th><th>選択肢</th><th>正解</th><th>失敗時↓</th><th></th></tr></thead>
       <tbody id="qrows"></tbody>
     </table></div>
     <div class="row" style="margin-top:10px">
@@ -88,6 +88,7 @@
     </div>
     <div class="row" style="margin-top:10px">
       <button type="button" class="ctrl sub" id="bLobby">タイトル画面</button>
+      <button type="button" class="ctrl sub" id="bRankboard">全チーム格付け表示</button>
       <button type="button" class="ctrl sub" id="bFinal">最終結果発表</button>
       <button type="button" class="ctrl danger" id="bRedo">この問題をやり直す</button>
       <button type="button" class="ctrl danger" id="bReset">全リセット</button>
@@ -106,7 +107,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.7"></script>
+<script src="app.js?v=11.8"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
@@ -133,7 +134,8 @@ function renderTeams() {
   $("#teamCount").value = teamRows.length;
   $("#trows").innerHTML = teamRows.map((t, i) =>
     '<tr data-i="' + i + '"><td><b>' + esc(t.id) + '</b></td>' +
-    '<td><input type="text" data-f="name" maxlength="20" value="' + esc(t.name) + '" aria-label="' + esc(t.id) + 'のチーム名"></td>' +
+    '<td><input type="text" data-f="name" maxlength="20" value="' + esc(t.name) + '"></td>' +
+    '<td><select data-f="language"><option value="ja"'+(t.language!=="en"?" selected":"")+'>日本語</option><option value="en"'+(t.language==="en"?" selected":"")+'>English</option></select></td>' +
     '<td><code>' + esc(t.key.slice(0, 6)) + '…' + esc(t.key.slice(-4)) + '</code></td>' +
     '<td class="url"><a href="' + esc(voteUrl(t)) + '" target="_blank" rel="noopener">' + esc(voteUrl(t)) + '</a></td>' +
     '<td><button type="button" class="ctrl sub" data-keygen="' + i + '">キー再発行</button></td></tr>').join("");
@@ -146,13 +148,13 @@ $("#teamCount").addEventListener("change", () => {
     if (!confirm("次のチームを削除します：\n" + removed)) { renderTeams(); return; }
     teamRows = teamRows.slice(0, n);
   }
-  while (teamRows.length < n) { const id = nextTeamId(teamRows); teamRows.push({ id, name: id + "チーム", key: randomTeamKey() }); }
+  while (teamRows.length < n) { const id = nextTeamId(teamRows); teamRows.push({ id, name: id + "チーム", language: "ja", key: randomTeamKey() }); }
   renderTeams(); setDirty(true);
 });
-$("#trows").addEventListener("input", e => {
+$("#trows").addEventListener("change", e => {
   const tr = e.target.closest("tr");
-  if (!tr || e.target.dataset.f !== "name") return;
-  teamRows[+tr.dataset.i].name = e.target.value;
+  if (!tr || !["name","language"].includes(e.target.dataset.f)) return;
+  teamRows[+tr.dataset.i][e.target.dataset.f] = e.target.value;
   setDirty(true);
 });
 $("#trows").addEventListener("click", e => {
@@ -172,12 +174,11 @@ $("#copyUrls").addEventListener("click", async () => {
 function renderRanks() {
   $("#rrows").innerHTML = rankRows.map((r, i) =>
     '<tr data-i="' + i + '"><td>' + (i + 1) + '</td>' +
-    '<td><input type="text" data-f="name" maxlength="20" value="' + esc(r.name) + '" aria-label="' + (i + 1) + '番目のランク名"></td>' +
-    '<td><input type="color" data-f="color" value="' + esc(r.color) + '" aria-label="' + (i + 1) + '番目のランクの背景色"></td>' +
+    '<td><input type="text" data-f="nameJa" maxlength="20" value="' + esc(r.nameJa||r.name||"") + '"></td>' +
+    '<td><input type="text" data-f="nameEn" maxlength="30" value="' + esc(r.nameEn||r.name||"") + '"></td>' +
+    '<td><input type="color" data-f="color" value="' + esc(r.color) + '"></td>' +
     '<td>' + rankBadge(r) + '</td>' +
-    '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up" aria-label="上へ">↑</button>' +
-    '<button type="button" class="ctrl sub" data-act="down" aria-label="下へ">↓</button>' +
-    '<button type="button" class="ctrl danger" data-act="del" aria-label="削除">✕</button></td></tr>').join("");
+    '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up">↑</button><button type="button" class="ctrl sub" data-act="down">↓</button><button type="button" class="ctrl danger" data-act="del">✕</button></td></tr>').join("");
 }
 $("#rrows").addEventListener("input", e => {
   const tr = e.target.closest("tr"), f = e.target.dataset.f;
@@ -211,20 +212,16 @@ $("#addR").addEventListener("click", () => {
 // ---------- 問題 ----------
 function renderRows() {
   $("#qrows").innerHTML = rows.map((q, i) => {
-    const n = clampN(q.n);
-    const nSel = [2, 3, 4].map(k => '<option value="' + k + '"' + (k === n ? ' selected' : '') + '>' + LETTERS.slice(0, k).join("/") + '</option>').join("");
-    const aSel = '<option value="">--</option>' + LETTERS.slice(0, n).map(L => '<option' + (q.answer === L ? ' selected' : '') + '>' + L + '</option>').join("");
-    return '<tr data-i="' + i + '"><td>' + (i + 1) + '</td>' +
-      '<td><input type="text" data-f="text" maxlength="80" value="' + esc(q.text) + '" aria-label="第' + (i + 1) + '問の問題文"></td>' +
-        '<td><div class="asset-mini" data-qimg="' + i + '"></div><label class="ctrl sub asset-file">画像選択<input type="file" data-imgfile="' + i + '" accept="image/png,image/jpeg,image/webp" hidden></label> ' + (q.imagePath ? '<button type="button" class="ctrl danger" data-imgdel="' + i + '">削除</button>' : '') + '</td>' +
-      '<td><select data-f="n" aria-label="選択肢">' + nSel + '</select></td>' +
-      '<td><select data-f="answer" aria-label="正解">' + aSel + '</select></td>' +
-      '<td><input type="number" data-f="penalty" min="0" max="10" value="' + esc(q.penalty) + '" aria-label="第' + (i + 1) + '問の失敗時の降格数"></td>' +
-      '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up" aria-label="上へ">↑</button>' +
-      '<button type="button" class="ctrl sub" data-act="down" aria-label="下へ">↓</button>' +
-      '<button type="button" class="ctrl danger" data-act="del" aria-label="削除">✕</button></td></tr>';
+    const opts = '<option value="">未設定</option>' + LETTERS.slice(0, q.n).map(x => '<option value="' + x + '"' + (q.answer === x ? ' selected' : '') + '>' + x + '</option>').join("");
+    return '<tr data-i="' + i + '"><td><b>第' + (i + 1) + '問</b></td>' +
+      '<td><input type="text" data-f="text" maxlength="80" value="' + esc(q.text) + '"></td>' +
+      '<td><div class="asset-mini slides-mini" data-qimg="' + i + '"></div><label class="ctrl sub asset-file">画像追加<input type="file" data-imgfile="' + i + '" accept="image/png,image/jpeg,image/webp" multiple hidden></label></td>' +
+      '<td><select data-f="n"><option value="2"' + (q.n === 2 ? ' selected' : '') + '>A/B</option><option value="3"' + (q.n === 3 ? ' selected' : '') + '>A/B/C</option><option value="4"' + (q.n === 4 ? ' selected' : '') + '>A/B/C/D</option></select></td>' +
+      '<td><select data-f="answer">' + opts + '</select></td>' +
+      '<td><input type="number" data-f="penalty" min="0" max="10" value="' + q.penalty + '"></td>' +
+      '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up">↑</button><button type="button" class="ctrl sub" data-act="down">↓</button><button type="button" class="ctrl danger" data-act="del">✕</button></td></tr>';
   }).join("") || '<tr><td colspan="7" class="muted">問題がありません。「＋ 問題を追加」で追加してください。</td></tr>';
-  rows.forEach((q,i)=>{ if(q.imagePath) showAssetPreview(document.querySelector('[data-qimg="'+i+'"]'),q.imagePath); });
+  rows.forEach((q,i)=>renderSlidePreviews(i,q.slides||[]));
 }
 $("#qrows").addEventListener("input", e => {
   const tr = e.target.closest("tr"), f = e.target.dataset.f;
@@ -250,23 +247,23 @@ $("#qrows").addEventListener("click", e => {
   renderRows(); setDirty(true);
 });
 $("#qrows").addEventListener("change", async e => {
-  const i=+(e.target.dataset.imgfile??-1); if(i<0||!e.target.files?.[0]) return;
-  const file=e.target.files[0]; e.target.value="";
-  try { const old=rows[i].imagePath; const path=await uploadAsset(file,"questions","q"+(i+1)); rows[i].imagePath=path; if(old) deleteAsset(old).catch(console.error); renderRows(); setDirty(true); }
+  const i=+(e.target.dataset.imgfile??-1); if(i<0||!e.target.files?.length) return;
+  const files=[...e.target.files]; e.target.value="";
+  try { rows[i].slides=rows[i].slides||[]; for(const file of files){ rows[i].slides.push(await uploadAsset(file,"questions","q"+(i+1)+"_s"+(rows[i].slides.length+1))); } renderRows(); setDirty(true); }
   catch(err){ alert(err.message||err); }
 });
 $("#qrows").addEventListener("click", async e => {
-  const b=e.target.closest("button[data-imgdel]"); if(!b)return; const i=+b.dataset.imgdel;
-  if(!confirm("第"+(i+1)+"問の画像を削除しますか？"))return;
-  const old=rows[i].imagePath; rows[i].imagePath=""; renderRows(); setDirty(true); if(old) deleteAsset(old).catch(console.error);
+  const b=e.target.closest("button[data-slidedel]"); if(!b)return; const [qi,si]=b.dataset.slidedel.split(":").map(Number);
+  if(!confirm("このスライドを削除しますか？"))return;
+  const old=rows[qi].slides?.[si]; rows[qi].slides.splice(si,1); renderRows(); setDirty(true); if(old) deleteAsset(old).catch(console.error);
 });
 async function showAssetPreview(el,path){ if(!el||!path)return; try{const u=await storageUrl(path); const img=document.createElement("img");img.src=u;img.alt="プレビュー";el.replaceChildren(img);}catch(e){el.textContent="画像を取得できません";} }
+async function renderSlidePreviews(qi,paths){ const el=document.querySelector('[data-qimg="'+qi+'"]'); if(!el)return; el.innerHTML=""; for(let si=0;si<paths.length;si++){const item=document.createElement("div");item.className="slide-thumb"; const no=document.createElement("span");no.textContent=(si+1)+""; item.appendChild(no); try{const u=await storageUrl(paths[si]);const img=document.createElement("img");img.src=u;img.alt="スライド"+(si+1);item.appendChild(img);}catch(e){item.append("取得失敗");} const del=document.createElement("button");del.type="button";del.className="ctrl danger";del.dataset.slidedel=qi+":"+si;del.textContent="✕";item.appendChild(del);el.appendChild(item);} }
 function renderTitleImage(){ const el=$("#titleImagePreview"); el.innerHTML=""; $("#titleImageStatus").textContent=titleImagePath?titleImagePath:"未登録"; if(titleImagePath)showAssetPreview(el,titleImagePath); }
 $("#titleImageFile").addEventListener("change",async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;try{const old=titleImagePath;titleImagePath=await uploadAsset(f,"title","title");if(old)deleteAsset(old).catch(console.error);renderTitleImage();setDirty(true);}catch(err){alert(err.message||err);}});
 $("#deleteTitleImage").addEventListener("click",()=>{if(!titleImagePath||!confirm("タイトル画像を削除しますか？"))return;const old=titleImagePath;titleImagePath="";renderTitleImage();setDirty(true);deleteAsset(old).catch(console.error);});
-
 $("#addQ").addEventListener("click", () => {
-  rows.push({ text: "", n: 2, answer: "", penalty: 1, imagePath: "" });
+  rows.push({ text: "", n: 2, answer: "", penalty: 1, slides: [] });
   renderRows(); setDirty(true);
   const inputs = document.querySelectorAll('#qrows input[data-f="text"]');
   if (inputs.length) inputs[inputs.length - 1].focus();
@@ -292,14 +289,14 @@ async function loadSetup() {
 $("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中の内容を破棄しますか？")) loadSetup(); });
 
 $("#saveSetup").addEventListener("click", async () => {
-  const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim(), key: t.key || randomTeamKey() }));
-  const ranks = rankRows.map(r => ({ name: String(r.name || "").trim(), color: r.color }));
-  const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1), imagePath: String(q.imagePath || "") }));
+  const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim(), language: t.language === "en" ? "en" : "ja", key: t.key || randomTeamKey() }));
+  const ranks = rankRows.map(r => ({ name: String(r.nameJa || r.name || "").trim(), nameJa: String(r.nameJa || r.name || "").trim(), nameEn: String(r.nameEn || r.name || "").trim(), color: r.color }));
+  const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1), slides: (q.slides||[]).slice() }));
   let i;
   if (!teams.length) return alert("チームが1つもありません");
   if ((i = teams.findIndex(t => !t.name)) >= 0) return alert("チーム「" + teams[i].id + "」の名前が未入力です");
   if (ranks.length < 2) return alert("ランクは2つ以上必要です");
-  if ((i = ranks.findIndex(r => !r.name)) >= 0) return alert((i + 1) + "番目のランク名が未入力です");
+  if ((i = ranks.findIndex(r => !r.nameJa || !r.nameEn)) >= 0) return alert((i + 1) + "番目のランク名（日/英）が未入力です");
   if ((i = questions.findIndex(q => !q.text || !q.answer)) >= 0) return alert("第" + (i + 1) + "問の問題文または正解が未入力です");
   const timerSec = clampInt($("#timer").value, 0, 600, 0);
 
@@ -309,11 +306,11 @@ $("#saveSetup").addEventListener("click", async () => {
   try {
     await Promise.all([
       db.ref("setup").set({ questions, timerSec, teams, ranks, titleImagePath }),
-      db.ref("publicSetup").set({ timerSec, teams:teams.map(t=>({id:t.id,name:t.name})), ranks, questions:questions.map(q=>({text:q.text,n:q.n,penalty:q.penalty})) }),
+      db.ref("publicSetup").set({ timerSec, teams:teams.map(t=>({id:t.id,name:t.name,language:t.language})), ranks, questions:questions.map(q=>({text:q.text,n:q.n,penalty:q.penalty})) }),
       db.ref("teamKeys").set(Object.fromEntries(teams.map(t=>[t.id,t.key])))
     ]);
     await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: questions.length });
-    fillEditor({ questions, timerSec, teams, ranks });
+    fillEditor({ questions, timerSec, teams, ranks, titleImagePath });
     setDirty(false);
     $("#dirty").textContent = "✔ 保存しました";
     setTimeout(() => { if (!dirty) $("#dirty").textContent = ""; }, 3000);
@@ -407,6 +404,7 @@ $("#manualAns").addEventListener("click", e => {
   if (b && G.current && confirm("「" + b.dataset.ans + "」を正解として発表しますか？")) Ops.reveal(G, b.dataset.ans);
 });
 $("#bLobby").addEventListener("click", () => Ops.lobby());
+$("#bRankboard").addEventListener("click", () => Ops.rankboard());
 $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
 $("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答・確定・正解を消して、やり直しますか？")) Ops.redo(G); });
 $("#bReset").addEventListener("click", () => { if (confirm("全問題の回答・正解・格付け・回答時間を消去して最初に戻します。よろしいですか？\n（登録した問題・チーム・ランクは消えません）")) Ops.resetAll(G); });

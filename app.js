@@ -4,7 +4,7 @@ firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
 const APP_VERSION = 11;
-const APP_BUILD = "11.7-storage";
+const APP_BUILD = "11.8";
 const storage = firebase.storage ? firebase.storage() : null;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
@@ -15,7 +15,7 @@ const clampN = n => clampInt(n, 2, 4, 2);
 const toArr = x => (Array.isArray(x) ? x : Object.values(x || {})).filter(Boolean);
 
 const defaults = { title: "格付けチェック", current: 0, total: 0, phase: "lobby", question: "", choices: ["A", "B"], answer: null, deadline: null, sessionId: "legacy" };
-const PHASE_LABEL = { lobby: "開始前", ready: "問題表示中", open: "回答受付中", closed: "締切", answer: "正解発表", final: "最終結果" };
+const PHASE_LABEL = { lobby: "開始前", ready: "問題表示中", open: "回答受付中", closed: "締切", answer: "正解発表", rankboard: "全チーム格付け", final: "最終結果" };
 
 // ===== 初期値（管理画面で未設定のときに使う） =====
 const DEFAULT_RANK_NAMES = ["一流", "普通", "二流", "三流", "そっくりさん", "映す価値なし"];
@@ -32,21 +32,22 @@ function randomTeamKey() {
 }
 function defaultTeams() {
   const ids = Array.isArray(C.teams) && C.teams.length ? C.teams : "ABCDEFGHIJKLMNOP".split("");
-  return ids.map(id => ({ id: String(id).toUpperCase(), name: String(id).toUpperCase() + "チーム", key: randomTeamKey() }));
+  return ids.map(id => ({ id: String(id).toUpperCase(), name: String(id).toUpperCase() + "チーム", language: "ja", key: randomTeamKey() }));
 }
-function defaultRanks() { return DEFAULT_RANK_NAMES.map((n, i) => ({ name: n, color: DEFAULT_RANK_COLORS[i] })); }
+function defaultRanks() { const en=["First Class","Regular","Second Class","Third Class","Look-alike","Not Worth Showing"]; return DEFAULT_RANK_NAMES.map((n, i) => ({ name:n, nameJa:n, nameEn:en[i]||n, color: DEFAULT_RANK_COLORS[i] })); }
 
 // DB の setup を安全な形にそろえる
 function normalizeSetup(v) {
   v = v || {};
-  const teams = toArr(v.teams).map(t => ({ id: String(t.id || "").toUpperCase(), name: String(t.name || t.id || ""), key: /^[0-9a-f]{32}$/i.test(t.key || "") ? t.key : randomTeamKey() }))
+  const teams = toArr(v.teams).map(t => ({ id: String(t.id || "").toUpperCase(), name: String(t.name || t.id || ""), language: t.language === "en" ? "en" : "ja", key: /^[0-9a-f]{32}$/i.test(t.key || "") ? t.key : randomTeamKey() }))
     .filter(t => /^[A-Z]{1,2}$/.test(t.id));
-  const ranks = toArr(v.ranks).map(r => ({ name: String(r.name || ""), color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : "#555555" }));
+  const ranks = toArr(v.ranks).map(r => ({ name: String(r.nameJa || r.name || ""), nameJa: String(r.nameJa || r.name || ""), nameEn: String(r.nameEn || r.name || ""), color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : "#555555" }));
   return {
     questions: toArr(v.questions).map(q => ({
       text: String(q.text || ""), n: clampN(q.n),
       answer: LETTERS.includes(q.answer) ? q.answer : "",
       penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1),
+      slides: toArr(q.slides).map(String).filter(Boolean).length ? toArr(q.slides).map(String).filter(Boolean) : (q.imagePath ? [String(q.imagePath)] : []),
       imagePath: String(q.imagePath || "")
     })),
     titleImagePath: String(v.titleImagePath || ""),
@@ -154,7 +155,8 @@ const CHOICE_COLORS = { A: "#d93636", B: "#2e9e5b", C: "#e6c229", D: "#2f6fd6" }
 const NOVOTE_COLOR = "#4a4a4a";
 const choiceStyle = v => { const c = CHOICE_COLORS[v] || NOVOTE_COLOR; return "background:" + c + ";color:" + textColor(c); };
 const rankStyle = r => "background:" + r.color + ";color:" + textColor(r.color);
-const rankBadge = (r, cls) => '<span class="badge ' + (cls || "") + '" style="' + rankStyle(r) + '">' + esc(r.name) + "</span>";
+const rankName = (r, lang="ja") => lang === "en" ? (r.nameEn || r.nameJa || r.name || "") : (r.nameJa || r.name || r.nameEn || "");
+const rankBadge = (r, cls, lang) => lang ? '<span class="badge ' + (cls || "") + '" style="' + rankStyle(r) + '">' + esc(rankName(r,lang)) + "</span>" : '<span class="badge bilingual ' + (cls || "") + '" style="' + rankStyle(r) + '"><span>' + esc(rankName(r,"ja")) + '</span><small>' + esc(rankName(r,"en")) + '</small></span>';
 
 // ===== Storage画像 =====
 function safeImagePath(p){ return /^event-assets\/[A-Za-z0-9_./-]+$/.test(String(p||"")) ? String(p) : ""; }
@@ -211,9 +213,9 @@ function watchAll(onChange, onTick, onError) {
 function publicGameFrom(g) {
   const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
   SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
-  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy"};
+  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",slideIndex:g.slideIndex||0};
   if(ph==="lobby" && SETUP.titleImagePath) out.imagePath=SETUP.titleImagePath;
-  if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1]; if(cq?.imagePath) out.imagePath=cq.imagePath; }
+  if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1], slides=cq?.slides||[]; if(slides.length){ out.imagePath=slides[Math.min(g.slideIndex||0,slides.length-1)]; out.slideCount=slides.length; } }
   if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
   if(ph==="answer") out.answer=g.answer||null;
   return out;
@@ -247,7 +249,7 @@ const Ops = {
     if (!q) { alert("第" + i + "問は登録されていません"); return; }
     return db.ref("game").update({
       current: i, total: SETUP.questions.length, question: q.text || "",
-      choices: LETTERS.slice(0, clampN(q.n)), phase: "ready", answer: null, deadline: null
+      choices: LETTERS.slice(0, clampN(q.n)), phase: "ready", slideIndex: 0, answer: null, deadline: null
     });
   },
   start(g, sec) {
@@ -272,6 +274,8 @@ const Ops = {
       ["closed/" + g.current]: closedAt
     });
   },
+  slide(g, dir=1) { const q=SETUP.questions[g.current-1], n=q?.slides?.length||0; if(!n)return Promise.resolve(); return db.ref("game/slideIndex").set(Math.max(0,Math.min(n-1,(g.slideIndex||0)+dir))); },
+  rankboard() { return db.ref("game").update({ phase: "rankboard", deadline: null }); },
   final() { return db.ref("game").update({ phase: "final", deadline: null }); },
   lobby() { return db.ref("game").update({ phase: "lobby", deadline: null }); },
   redo(g) {

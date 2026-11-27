@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.7">
+<link rel="stylesheet" href="style.css?v=11.8">
 <title>格付けチェック スクリーン</title>
 </head>
 <body class="screen-page">
@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.7"></script>
+<script src="app.js?v=11.8"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;
@@ -42,13 +42,20 @@ function render(g) {
     return;
   }
 
+  // 最終結果の前に全チームの現在ランクを表示
+  if (ph === "rankboard") {
+    head.innerHTML='<div class="big gold">全チーム格付け / All Team Ranks</div>';
+    const groups=SETUP.ranks.map((rank,ri)=>({rank,teams:SETUP.teams.filter(t=>(g.rankIndexes?.[t.id]??0)===ri)}));
+    body.innerHTML='<div class="rankgrid rankboard">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(rankName(gr.rank,"ja"))+'<small>'+esc(rankName(gr.rank,"en"))+'</small></h3>'+gr.teams.map(t=>'<span class="t">'+esc(t.name)+'</span>').join('')+'</div>').join('')+'</div>';
+    return;
+  }
   // 最終結果は公開済みの集計結果だけを使用
   if (ph === "final") {
     if (finalShown) return; finalShown=true;
     db.ref("publicResults").once("value").then(snap=>{
       const rr=snap.val()||{}, best=toArr(rr.best), groups=toArr(rr.groups);
       head.innerHTML='<div class="big gold">最終結果発表</div><p class="center muted">同じ格付けなら、回答時間の合計が短いチームが上位</p>';
-      body.innerHTML='<div class="best">'+best.map((x,i)=>'<div class="place'+(x.place===1?' p1':'')+'" style="animation-delay:'+(1+i*2.5)+'s"><span class="no">'+x.place+'位</span><span class="nm">'+esc(x.name)+'</span>'+rankBadge(x.rank)+'<span class="sec">合計 '+fmtSec(x.ms)+'</span></div>').join('')+'</div><h2 class="gold">全チームの格付け</h2><div class="rankgrid">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(gr.rank.name)+'（'+toArr(gr.names).length+'）</h3>'+toArr(gr.names).map(n=>'<span class="t">'+esc(n)+'</span>').join('')+'</div>').join('')+'</div>';
+      body.innerHTML='<div class="best">'+best.map((x,i)=>'<div class="place'+(x.place===1?' p1':'')+'" style="animation-delay:'+(1+i*2.5)+'s"><span class="no">'+x.place+'位</span><span class="nm">'+esc(x.name)+'</span>'+rankBadge(x.rank)+'<span class="sec">合計 '+fmtSec(x.ms)+'</span></div>').join('')+'</div><h2 class="gold">全チームの格付け</h2><div class="rankgrid">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(rankName(gr.rank,"ja"))+'<small>'+esc(rankName(gr.rank,"en"))+'</small>'+'（'+toArr(gr.names).length+'）</h3>'+toArr(gr.names).map(n=>'<span class="t">'+esc(n)+'</span>').join('')+'</div>').join('')+'</div>';
     }); return;
   }
 

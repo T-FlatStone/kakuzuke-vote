@@ -1,16 +1,18 @@
-# kakuzuke-vote v11.7-storage
+# kakuzuke-vote v11.8
 
-- Admin/Host認証、チームキー、非公開回答、回答時間、順位・ベスト4を維持
-- Adminからタイトル画像と問題画像をFirebase Storageへアップロード
-- PNG/JPEG/WebP、5MB未満
-- タイトル画像/問題画像が未登録なら従来のテキスト表示
-- タイトル画像 → 問題画像 → 回答開始 → 締切 → 正解 → 次問題画像 → 最終結果
-- JSONへ titleImagePath / questions[].imagePath を保存・復元
-- 全リセット時にsessionIdを更新し、Voteの前回選択を持ち越さない
-- A=赤 / B=緑 / C=黄 / D=青
+## v11.8
+- 問題前スライドを複数枚登録可能。Adminで複数画像を一括追加し、Hostの「次のスライド」で順送り。
+- Voteの表示言語をチームごとに「日本語 / English」指定。
+- ランク名を日本語名・英語名で登録。Screenでは両方を表示し、Voteではチーム言語側のみ表示。
+- 最終結果の前に「全チーム格付け / All Team Ranks」を表示する進行フェーズを追加。
+- 正解カードの白枠をカード内側に固定し、画面端での見切れを防止。
+- v11.7のFirebase Storage、タイトル画像、認証、チームKey、回答時間、順位、sessionIdを維持。
 
-## 反映
-1. ZIP内のWebファイルをGitHubへ上書き
-2. Storage Rulesは `storage.rules` をFirebase Storageのルールへ反映（既に同内容なら不要）
-3. Adminでログインし、画像を選択してから設定を保存
-4. 既存JSONは画像なし設定としてそのまま読み込み可能
+## 本番進行
+タイトル → 問題前スライド（1〜複数）→ 回答開始 → 締切 → 正解 → 次問題 → … → 全チーム格付け → 最終結果
+
+## 更新
+- GitHubへWebファイル一式を上書き。
+- Realtime Database Rulesは `database.rules.json` を再公開（Hostによる `slideIndex` 更新許可を追加）。
+- Storage Rulesはv11.7から変更なし。
+- Adminで既存設定を読み込み、各ランクの英語名と各チームの言語を設定して保存。
