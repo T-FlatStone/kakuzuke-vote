@@ -1,20 +1,16 @@
-# kakuzuke-vote v11 (rebuild 11.3)
+# kakuzuke-vote v11.7-storage
 
-全画面を同一ビルドとして再構成。HTMLは app.js/style.css の `?v=11.3` を参照し、キャッシュ混在を防止。
-
-- Admin/Host: Email/Password認証後のみ private setup/game を購読
-- Admin/Host: private game → publicGame/publicResults を同期
-- Vote: Anonymous Auth + team/keyをRulesで照合後、publicSetup/publicGameを購読
-- Screen: publicSetup/publicGame/publicResultsのみ
-- 投票受付中は他チームのA/B/C/Dを公開しない。締切後にrevealedVotesを公開
+- Admin/Host認証、チームキー、非公開回答、回答時間、順位・ベスト4を維持
+- Adminからタイトル画像と問題画像をFirebase Storageへアップロード
+- PNG/JPEG/WebP、5MB未満
+- タイトル画像/問題画像が未登録なら従来のテキスト表示
+- タイトル画像 → 問題画像 → 回答開始 → 締切 → 正解 → 次問題画像 → 最終結果
+- JSONへ titleImagePath / questions[].imagePath を保存・復元
+- 全リセット時にsessionIdを更新し、Voteの前回選択を持ち越さない
 - A=赤 / B=緑 / C=黄 / D=青
 
-## 更新
-1. GitHubをZIP内9ファイルで全上書き
-2. Firebase Authentication: Email/Password と Anonymous を有効化
-3. Realtime Database Rulesへ同梱database.rules.jsonを反映
-4. Adminログイン → 保存を1回押す
-5. Hostログイン → 第1問へ → 回答開始
-6. Aチームの最新キー付きURLで確認
-
-- v11.6: 正解カード白枠を内側描画へ変更。画面端で切れない。
+## 反映
+1. ZIP内のWebファイルをGitHubへ上書き
+2. Storage Rulesは `storage.rules` をFirebase Storageのルールへ反映（既に同内容なら不要）
+3. Adminでログインし、画像を選択してから設定を保存
+4. 既存JSONは画像なし設定としてそのまま読み込み可能

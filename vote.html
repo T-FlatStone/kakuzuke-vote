@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.6">
+<link rel="stylesheet" href="style.css?v=11.7">
 <title>格付けチェック 投票</title>
 </head>
 <body>
@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.6"></script>
+<script src="app.js?v=11.7"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const app = document.querySelector("#app");
@@ -32,7 +32,8 @@ function render(g) {
     return;
   }
   const ph = phaseOf(g);
-  const mine = sessionStorage.getItem("kk_"+g.current+"_"+me.id) || "";
+  const sk = "kk_"+(g.sessionId||"legacy")+"_"+g.current+"_"+me.id;
+    const mine = sessionStorage.getItem(sk) || "";
   const conf = !!g.confirmed?.[me.id];
   const r = SETUP.ranks[g.rankIndexes?.[me.id] ?? 0] || SETUP.ranks[0];
   let h = '<div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(me.name) + '</h2>' + rankBadge(r) + '</div>';
@@ -72,14 +73,14 @@ function render(g) {
   // 選択（確定前なら何度でも変更可）
   app.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => {
     if (phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
-    const before = sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
+    const before = sessionStorage.getItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id) || "";
     localVote = b.dataset.v;
-    sessionStorage.setItem("kk_"+G.current+"_"+me.id, localVote);
+    sessionStorage.setItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id, localVote);
     render(G); // private vote変更はpublicGameを更新しないため、手元の選択UIは即座に再描画する
     db.ref("game/votes/" + G.current + "/" + me.id).set(localVote).catch(err => {
       console.error(err);
       localVote = before;
-      if (before) sessionStorage.setItem("kk_"+G.current+"_"+me.id, before); else sessionStorage.removeItem("kk_"+G.current+"_"+me.id);
+      if (before) sessionStorage.setItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id, before); else sessionStorage.removeItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id);
       render(G);
       alert("回答を保存できませんでした。投票URLまたは通信状態を確認してください。");
     });
@@ -87,7 +88,7 @@ function render(g) {
   // 確定（ここで時刻を記録。確定後は変更不可）
   const cb = app.querySelector("#confirm");
   if (cb) cb.addEventListener("click", async () => {
-    const v = sessionStorage.getItem("kk_"+G.current+"_"+me.id) || "";
+    const v = sessionStorage.getItem("kk_"+(G.sessionId||"legacy")+"_"+G.current+"_"+me.id) || "";
     if (busy || !v || phaseOf(G) !== "open" || !!G.confirmed?.[me.id]) return;
     if (!confirm(v + " で確定しますか？\n確定すると変更できません。")) return;
     busy = true; cb.disabled = true;

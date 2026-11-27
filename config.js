@@ -5,6 +5,7 @@ window.KAKUZUKE_CONFIG = {
     authDomain: "xmasparty-4c953.firebaseapp.com",
     databaseURL: "https://xmasparty-4c953-default-rtdb.firebaseio.com/",
     projectId: "xmasparty-4c953",
+      storageBucket: "xmasparty-4c953.firebasestorage.app",
     appId: "1:379722280967:web:94c2cfe94af5f0e632faa2"
   },
   roles: { adminUid: "omioogIDRwgDg2EN6LSaAMW7YN42", hostUid: "2IWnSAE2UhPeE0epYNrKXDwnmH23" },

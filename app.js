@@ -4,6 +4,8 @@ firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
 const APP_VERSION = 11;
+const APP_BUILD = "11.7-storage";
+const storage = firebase.storage ? firebase.storage() : null;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
 const LETTERS = ["A", "B", "C", "D"];
@@ -12,7 +14,7 @@ const clampInt = (v, min, max, def) => { const n = parseInt(v, 10); return Numbe
 const clampN = n => clampInt(n, 2, 4, 2);
 const toArr = x => (Array.isArray(x) ? x : Object.values(x || {})).filter(Boolean);
 
-const defaults = { title: "格付けチェック", current: 0, total: 0, phase: "lobby", question: "", choices: ["A", "B"], answer: null, deadline: null };
+const defaults = { title: "格付けチェック", current: 0, total: 0, phase: "lobby", question: "", choices: ["A", "B"], answer: null, deadline: null, sessionId: "legacy" };
 const PHASE_LABEL = { lobby: "開始前", ready: "問題表示中", open: "回答受付中", closed: "締切", answer: "正解発表", final: "最終結果" };
 
 // ===== 初期値（管理画面で未設定のときに使う） =====
@@ -44,8 +46,10 @@ function normalizeSetup(v) {
     questions: toArr(v.questions).map(q => ({
       text: String(q.text || ""), n: clampN(q.n),
       answer: LETTERS.includes(q.answer) ? q.answer : "",
-      penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1)
+      penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1),
+      imagePath: String(q.imagePath || "")
     })),
+    titleImagePath: String(v.titleImagePath || ""),
     timerSec: clampInt(v.timerSec, 0, 600, 0),
     teams: teams.length ? teams : defaultTeams(),
     ranks: ranks.length >= 2 ? ranks : defaultRanks()
@@ -152,6 +156,30 @@ const choiceStyle = v => { const c = CHOICE_COLORS[v] || NOVOTE_COLOR; return "b
 const rankStyle = r => "background:" + r.color + ";color:" + textColor(r.color);
 const rankBadge = (r, cls) => '<span class="badge ' + (cls || "") + '" style="' + rankStyle(r) + '">' + esc(r.name) + "</span>";
 
+// ===== Storage画像 =====
+function safeImagePath(p){ return /^event-assets\/[A-Za-z0-9_./-]+$/.test(String(p||"")) ? String(p) : ""; }
+async function storageUrl(path){
+  path=safeImagePath(path);
+  if(!path || !storage) return "";
+  return storage.ref(path).getDownloadURL();
+}
+function imageExt(file){
+  const m={"image/png":"png","image/jpeg":"jpg","image/webp":"webp"}; return m[file?.type]||"";
+}
+function validateImage(file){
+  if(!file) throw new Error("画像が選択されていません");
+  if(!imageExt(file)) throw new Error("PNG / JPEG / WebPのみ利用できます");
+  if(file.size >= 5*1024*1024) throw new Error("画像は5MB未満にしてください");
+}
+async function uploadAsset(file, kind, id){
+  validateImage(file);
+  if(!storage) throw new Error("Firebase Storage SDKが読み込まれていません");
+  const path="event-assets/"+kind+"/"+id+"_"+Date.now()+"."+imageExt(file);
+  await storage.ref(path).put(file,{contentType:file.type,cacheControl:"public,max-age=3600"});
+  return path;
+}
+async function deleteAsset(path){ path=safeImagePath(path); if(path&&storage) await storage.ref(path).delete(); }
+
 // ===== 監視 =====
 function watchAll(onChange, onTick, onError) {
   let g = { ...defaults }, lastPhase = null, haveGame = false, haveSetup = false;
@@ -183,7 +211,9 @@ function watchAll(onChange, onTick, onError) {
 function publicGameFrom(g) {
   const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
   SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
-  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks};
+  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy"};
+  if(ph==="lobby" && SETUP.titleImagePath) out.imagePath=SETUP.titleImagePath;
+  if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1]; if(cq?.imagePath) out.imagePath=cq.imagePath; }
   if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
   if(ph==="answer") out.answer=g.answer||null;
   return out;
@@ -253,6 +283,6 @@ const Ops = {
     });
   },
   resetAll(g) {
-    return db.ref("game").set({ title: g.title || defaults.title, phase: "lobby", current: 0, total: SETUP.questions.length });
+    return db.ref("game").set({ title: g.title || defaults.title, phase: "lobby", current: 0, total: SETUP.questions.length, sessionId: randomTeamKey() });
   }
 };
