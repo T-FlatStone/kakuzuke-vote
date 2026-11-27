@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.12">
+<link rel="stylesheet" href="style.css?v=11.13">
 <title>格付けチェック スクリーン</title>
 </head>
 <body class="screen-page">
@@ -17,13 +17,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.12"></script>
+<script src="app.js?v=11.13"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;
-  let imageToken=0;
-  async function showStageImage(path){const token=++imageToken, stage=document.querySelector("#imageStage"), img=document.querySelector("#stageImage"); if(!path){stage.hidden=true;return false;} try{const url=await storageUrl(path);if(token!==imageToken)return false;img.src=url;stage.hidden=false;return true;}catch(e){console.error(e);stage.hidden=true;return false;}}
-  function hideStageImage(){imageToken++;document.querySelector("#imageStage").hidden=true;}   // 最終結果のアニメーションを1回だけ再生するため
+  let imageToken=0; const imageCache=new Map();
+  async function cachedUrl(path){ if(imageCache.has(path))return imageCache.get(path); const u=await storageUrl(path); imageCache.set(path,u); return u; }
+  async function preloadStage(path){if(!path)return;try{const u=await cachedUrl(path);const i=new Image();i.src=u;}catch(e){console.warn("preload",e);}}
+  async function showStageImage(path){const token=++imageToken,stage=document.querySelector("#imageStage"),img=document.querySelector("#stageImage");if(!path){stage.hidden=true;return false;}stage.hidden=false;stage.classList.add("loading");img.style.visibility="hidden";try{const url=await cachedUrl(path);if(token!==imageToken)return false;await new Promise((ok,ng)=>{img.onload=ok;img.onerror=ng;img.src=url;if(img.complete)ok();});if(token!==imageToken)return false;img.style.visibility="visible";stage.classList.remove("loading");return true;}catch(e){console.error(e);stage.classList.remove("loading");stage.hidden=true;return false;}}
+  function hideStageImage(){imageToken++;const stage=document.querySelector("#imageStage");stage.hidden=true;stage.classList.remove("loading");}   // 最終結果のアニメーションを1回だけ再生するため
 
 function render(g) {
   const ph = phaseOf(g);
@@ -32,7 +34,7 @@ function render(g) {
   const body = document.querySelector("#body");
 
   if (ph !== "final") finalShown = false;
-    if((ph==="lobby"||ph==="intro"||ph==="ready")&&g.imagePath){ head.style.display="none"; body.style.display="none"; showStageImage(g.imagePath).then(ok=>{ if(!ok) render({...g,imagePath:null}); }); return; }
+    if((ph==="lobby"||ph==="intro"||ph==="ready")&&g.imagePath){ head.style.display="none"; body.style.display="none"; showStageImage(g.imagePath).then(ok=>{ if(!ok) render({...g,imagePath:null}); }); preloadStage(g.nextImagePath); return; }
     hideStageImage(); head.style.display="flex"; body.style.display="block";
 
   // 開始前

@@ -103,3 +103,5 @@ body.screen-page #body{min-height:0;overflow:hidden} body.screen-page #body>.tea
 
 /* ===== v11.8 ===== */
 .badge.bilingual{display:inline-flex;flex-direction:column;align-items:center;line-height:1.05}.badge.bilingual small{font-size:.72em;font-weight:700;opacity:.9;margin-top:2px}.rankbox h3 small{display:block;font-size:.72em;font-weight:700;margin-top:2px}.slides-mini{display:flex;flex-wrap:wrap;gap:6px;min-width:200px}.slide-thumb{display:grid;grid-template-columns:20px 90px 34px;gap:4px;align-items:center;background:#ffffff0b;padding:4px;border-radius:8px}.slide-thumb img{width:90px;height:54px;object-fit:cover;border-radius:5px}.slide-thumb .danger{padding:5px 8px}.rankgrid.rankboard{height:100%;align-content:center}.rankgrid.rankboard .rankbox{min-height:110px}.rankgrid.rankboard .rankbox .t{font-size:clamp(16px,2.4vh,25px)}
+
+.image-stage.loading{position:relative}.image-stage.loading::after{content:"画像を読み込んでいます… / Loading…";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:clamp(22px,3vw,42px);font-weight:900;background:#050508}

@@ -215,7 +215,8 @@ function publicGameFrom(g) {
   SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
   const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",introIndex:g.introIndex||0};
   if(ph==="lobby" && SETUP.titleImagePath) out.imagePath=SETUP.titleImagePath;
-  if(ph==="intro" && SETUP.introSlides.length){ out.imagePath=SETUP.introSlides[Math.min(g.introIndex||0,SETUP.introSlides.length-1)]; out.introCount=SETUP.introSlides.length; }
+  if(ph==="lobby" && SETUP.introSlides.length) out.nextImagePath=SETUP.introSlides[0];
+  if(ph==="intro" && SETUP.introSlides.length){ const ii=Math.min(g.introIndex||0,SETUP.introSlides.length-1); out.imagePath=SETUP.introSlides[ii]; out.introCount=SETUP.introSlides.length; if(ii+1<SETUP.introSlides.length)out.nextImagePath=SETUP.introSlides[ii+1]; }
   if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1]; if(cq?.imagePath) out.imagePath=cq.imagePath; }
   if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
   if(ph==="answer") out.answer=g.answer||null;
