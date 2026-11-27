@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.11">
+<link rel="stylesheet" href="style.css?v=11.12">
 <title>司会</title>
 </head>
 <body>
 <div id="loginView" class="auth-shell"><div class="auth-card"><h1>司会ログイン</h1><form id="loginForm"><label for="loginId">ID（メールアドレス）</label><input id="loginId" type="email" autocomplete="username" required><label for="loginPw">パスワード</label><input id="loginPw" type="password" autocomplete="current-password" required><button class="ctrl" type="submit">ログイン</button><div id="loginError" class="auth-error" aria-live="polite"></div></form></div></div>
 <main class="wrap" id="protectedApp" style="max-width:640px;display:none"><div class="auth-user"><span id="authWho"></span><button type="button" class="ctrl sub" id="logoutBtn">ログアウト</button></div>
-  <h1>司会 <small style="font-size:14px;color:#aaa">v11.11</small></h1>
+  <h1>司会 <small style="font-size:14px;color:#aaa">v11.12</small></h1>
   <div id="versionGuard" style="display:none;background:#8b1d1d;color:#fff;border:3px solid #ff6b6b;border-radius:14px;padding:16px;margin:12px 0;font-weight:900;font-size:20px">⚠ 古いシステムを検出しました。回答時間が計測されません。最新版を反映し、このページを再読み込みしてください。</div>
   <div class="card" id="info" aria-live="polite">読込中...</div>
   <div class="hostbtns">
@@ -25,7 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.11"></script>
+<script src="app.js?v=11.12"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) {
   document.querySelector("#versionGuard").style.display = "block";
@@ -64,11 +64,11 @@ function render(g) {
   $("#info").innerHTML = h;
   const manualClose = ph === "open" && !g.deadline;
   $("#bStart").textContent = manualClose ? "締め切る" : "回答開始";
-  $("#bStart").disabled = !(ph === "ready" || manualClose); $("#bSlide").disabled=!(ph==="ready"&&(g.slideIndex||0)<slideN-1); $("#bSlide").textContent="次のスライド（"+Math.min((g.slideIndex||0)+1,slideN)+" / "+slideN+"）";
+  $("#bStart").disabled = !(ph === "ready" || manualClose);
   $("#bAnswer").disabled = ph !== "closed";
   const introN=SETUP.introSlides.length;
   $("#bIntro").style.display=(ph==="lobby"||ph==="intro")?"block":"none";
-  $("#bIntro").disabled=!(ph==="lobby"||ph==="intro");
+  $("#bIntro").disabled = false;
   $("#bIntro").textContent=ph==="intro" ? (((g.introIndex||0)<introN-1)?"次のオープニング画像（"+((g.introIndex||0)+2)+" / "+introN+"）":"第1問へ") : (introN?"オープニング開始":"第1問へ");
   const isLast = g.current >= n && n > 0;
   $("#bNext").textContent = ph === "rankboard" ? "最終結果発表" : g.current === 0 ? "第1問へ" : isLast ? "全チーム格付け表示" : "次の問題へ";
