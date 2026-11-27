@@ -245,14 +245,14 @@ function autoClose(g) {
   }
 }
 
+// Hostは /game 全体への書込み権限を持たないため、必ず許可済み子パスへ個別に書く。
+function writeGame(fields){ return Promise.all(Object.entries(fields).map(([path,value])=>db.ref("game/"+path).set(value))); }
+
 const Ops = {
   goto(i) {
     const q = SETUP.questions[i - 1];
     if (!q) { alert("第" + i + "問は登録されていません"); return; }
-    return db.ref("game").update({
-      current: i, total: SETUP.questions.length, question: q.text || "",
-      choices: LETTERS.slice(0, clampN(q.n)), phase: "ready", answer: null, deadline: null
-    });
+    return writeGame({ current:i, total:SETUP.questions.length, question:q.text||"", choices:LETTERS.slice(0,clampN(q.n)), phase:"ready", answer:null, deadline:null });
   },
   start(g, sec) {
     sec = sec ?? SETUP.timerSec;
@@ -262,7 +262,7 @@ const Ops = {
     });
   },
   close(g) {
-    return db.ref("game").update({ phase: "closed", deadline: null, ["closed/" + g.current]: g.closed?.[g.current] || TS });
+    return writeGame({ phase:"closed", deadline:null, ["closed/"+g.current]:g.closed?.[g.current]||TS });
   },
   reveal(g, ans) {
     const q = SETUP.questions[g.current - 1];
@@ -276,11 +276,11 @@ const Ops = {
       ["closed/" + g.current]: closedAt
     });
   },
-  introStart() { return SETUP.introSlides.length ? db.ref("game").update({phase:"intro",introIndex:0,current:0,deadline:null}) : this.goto(1); },
+  introStart() { return SETUP.introSlides.length ? writeGame({phase:"intro",introIndex:0,current:0,deadline:null}) : this.goto(1); },
   introNext(g) { const n=SETUP.introSlides.length, i=g.introIndex||0; return i<n-1 ? db.ref("game/introIndex").set(i+1) : this.goto(1); },
-  rankboard() { return db.ref("game").update({ phase: "rankboard", deadline: null }); },
-  final() { return db.ref("game").update({ phase: "final", deadline: null }); },
-  lobby() { return db.ref("game").update({ phase: "lobby", deadline: null }); },
+  rankboard() { return writeGame({ phase:"rankboard", deadline:null }); },
+  final() { return writeGame({ phase:"final", deadline:null }); },
+  lobby() { return writeGame({ phase:"lobby", deadline:null }); },
   redo(g) {
     const c = g.current;
     return db.ref("game").update({
