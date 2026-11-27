@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.10">
+<link rel="stylesheet" href="style.css?v=11.11">
 <title>管理</title>
 </head>
 <body>
@@ -112,7 +112,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.10"></script>
+<script src="app.js?v=11.11"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
@@ -406,8 +406,8 @@ $("#manualAns").addEventListener("click", e => {
   if (b && G.current && confirm("「" + b.dataset.ans + "」を正解として発表しますか？")) Ops.reveal(G, b.dataset.ans);
 });
 $("#bLobby").addEventListener("click", () => Ops.lobby());
-$("#bIntroStart").addEventListener("click",()=>Ops.introStart());
-$("#bIntroNext").addEventListener("click",()=>Ops.introNext(G));
+$("#bIntroStart").addEventListener("click",()=>SETUP.introSlides.length?Ops.introStart():Ops.goto(1));
+$("#bIntroNext").addEventListener("click",()=>{const n=SETUP.introSlides.length;if(phaseOf(G)!=="intro")return;if((G.introIndex||0)<n-1)Ops.introNext(G);else Ops.goto(1);});
 $("#bRankboard").addEventListener("click", () => Ops.rankboard());
 $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
 $("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答・確定・正解を消して、やり直しますか？")) Ops.redo(G); });
