@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.9">
+<link rel="stylesheet" href="style.css?v=11.10">
 <title>格付けチェック スクリーン</title>
 </head>
 <body class="screen-page">
@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.9"></script>
+<script src="app.js?v=11.10"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;
@@ -42,13 +42,8 @@ function render(g) {
     return;
   }
 
-  // 最終結果の前に全チームの現在ランクを表示
-  if (ph === "rankboard") {
-    head.innerHTML='<div class="big gold">全チーム格付け / All Team Ranks</div>';
-    const groups=SETUP.ranks.map((rank,ri)=>({rank,teams:SETUP.teams.filter(t=>(g.rankIndexes?.[t.id]??0)===ri)}));
-    body.innerHTML='<div class="rankgrid rankboard">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(rankName(gr.rank,"ja"))+'<small>'+esc(rankName(gr.rank,"en"))+'</small></h3>'+gr.teams.map(t=>'<span class="t">'+esc(t.name)+'</span>').join('')+'</div>').join('')+'</div>';
-    return;
-  }
+  // 全チーム格付け：通常チームカードのまま、見出しだけ変更
+  const isRankboard = ph === "rankboard";
   // 最終結果は公開済みの集計結果だけを使用
   if (ph === "final") {
     if (finalShown) return; finalShown=true;
@@ -60,7 +55,8 @@ function render(g) {
   }
 
   let statusHtml;
-  if (ph === "open") statusHtml = '<div class="screen-statusline open-state"><div class="screen-center-open"><div class="screen-timer-slot"><div class="screen-timer" id="tm"></div></div></div><div class="screen-confirmed">' + Object.keys(g.confirmed || {}).length + ' / ' + SETUP.teams.length + ' チーム回答済み</div></div>';
+  if (isRankboard) statusHtml = '<div class="screen-statusline"><div class="big gold">全チーム格付け / All Team Ranks</div></div>';
+  else if (ph === "open") statusHtml = '<div class="screen-statusline open-state"><div class="screen-center-open"><div class="screen-timer-slot"><div class="screen-timer" id="tm"></div></div></div><div class="screen-confirmed">' + Object.keys(g.confirmed || {}).length + ' / ' + SETUP.teams.length + ' チーム回答済み</div></div>';
   else if (ph === "closed") statusHtml = '<div class="screen-statusline closed-state"><div class="screen-status-main">締切！</div></div>';
   else if (ph === "answer") statusHtml = '<div class="screen-statusline answer-state"><div class="screen-status-main"><span class="gold">正解は ' + esc(g.answer) + '！</span></div></div>';
   else statusHtml = '<div class="screen-statusline pre"><div class="screen-status-main">まもなく回答開始</div></div>';
@@ -70,7 +66,8 @@ function render(g) {
     const conf = !!g.confirmed?.[t.id];
     const r = SETUP.ranks[g.rankIndexes?.[t.id] ?? 0] || SETUP.ranks[0];
     let cls = "team", txt, style;
-    if (ph === "answer") {
+    if (isRankboard) { txt = rankBadge(r); style = rankStyle(r); }
+    else if (ph === "answer") {
       const ok = v === g.answer, d = dropOf(g, t.id);
       cls += ok ? " ok" : " ng";
       txt = (v ? esc(v) + " " + (ok ? "⭕" : "❌") : "未投票 ❌") + (d > 0 ? ' <span class="drop">↓' + d + '</span>' : '');
@@ -82,7 +79,7 @@ function render(g) {
       txt = conf ? "✔ 回答済み" : "待機中";            // 確定するまでは「待機中」
       style = rankStyle(r);
     }
-    return '<div class="' + cls + '" style="' + style + '"><b>' + esc(t.name) + '</b><div class="ans">' + txt + '</div>' + rankBadge(r) + '</div>';
+    return '<div class="' + cls + '" style="' + style + '"><b>' + esc(t.name) + '</b><div class="ans">' + txt + '</div>' + (isRankboard ? '' : rankBadge(r)) + '</div>';
   }).join("") + '</div>';
 }
 

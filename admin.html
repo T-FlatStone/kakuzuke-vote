@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.9">
+<link rel="stylesheet" href="style.css?v=11.10">
 <title>管理</title>
 </head>
 <body>
@@ -84,6 +84,8 @@
       <button type="button" class="ctrl" id="bGoto">この問題を表示</button>
     </div>
     <div class="row" style="margin-top:10px">
+      <button type="button" class="ctrl sub" id="bIntroStart">オープニング開始</button>
+      <button type="button" class="ctrl sub" id="bIntroNext">次のオープニング画像</button>
       <button type="button" class="ctrl" id="bOpen">回答開始</button>
       <button type="button" class="ctrl sub" id="bClose">締切</button>
       <button type="button" class="ctrl" id="bReveal">正解発表（登録済み）</button>
@@ -110,7 +112,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.9"></script>
+<script src="app.js?v=11.10"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
@@ -404,6 +406,8 @@ $("#manualAns").addEventListener("click", e => {
   if (b && G.current && confirm("「" + b.dataset.ans + "」を正解として発表しますか？")) Ops.reveal(G, b.dataset.ans);
 });
 $("#bLobby").addEventListener("click", () => Ops.lobby());
+$("#bIntroStart").addEventListener("click",()=>Ops.introStart());
+$("#bIntroNext").addEventListener("click",()=>Ops.introNext(G));
 $("#bRankboard").addEventListener("click", () => Ops.rankboard());
 $("#bFinal").addEventListener("click", () => { if (confirm("最終結果を発表しますか？")) Ops.final(); });
 $("#bRedo").addEventListener("click", () => { if (G.current && confirm("第" + G.current + "問の回答・確定・正解を消して、やり直しますか？")) Ops.redo(G); });
