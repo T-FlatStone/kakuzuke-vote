@@ -213,7 +213,7 @@ function watchAll(onChange, onTick, onError) {
 function publicGameFrom(g) {
   const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
   SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
-  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",introIndex:g.introIndex||0};
+  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",introIndex:g.introIndex||0,stateRev:g.stateRev||0};
   if(ph==="lobby" && SETUP.titleImagePath) out.imagePath=SETUP.titleImagePath;
   if(ph==="lobby" && SETUP.introSlides.length) out.nextImagePath=SETUP.introSlides[0];
   if(ph==="intro" && SETUP.introSlides.length){ const ii=Math.min(g.introIndex||0,SETUP.introSlides.length-1); out.imagePath=SETUP.introSlides[ii]; out.introCount=SETUP.introSlides.length; if(ii+1<SETUP.introSlides.length)out.nextImagePath=SETUP.introSlides[ii+1]; }
@@ -246,7 +246,7 @@ function autoClose(g) {
 }
 
 // Hostは /game 全体への書込み権限を持たないため、必ず許可済み子パスへ個別に書く。
-function writeGame(fields){ return Promise.all(Object.entries(fields).map(([path,value])=>db.ref("game/"+path).set(value))); }
+function writeGame(fields){ fields.stateRev=serverNow(); return Promise.all(Object.entries(fields).map(([path,value])=>db.ref("game/"+path).set(value))); }
 
 const Ops = {
   goto(i) {
