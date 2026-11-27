@@ -32,7 +32,7 @@ input,select{padding:10px;border-radius:8px;border:1px solid #777;background:#18
 .team{padding:12px;border-radius:12px;background:#ffffff10;text-align:center;border:1px solid #ffffff30;transition:opacity .6s,filter .6s,transform .6s}
 .team b{display:block;font-size:22px;overflow-wrap:anywhere}
 .team .ans{font-size:20px;font-weight:800;margin:4px 0}
-.team.ok{outline:5px solid #fff;outline-offset:-5px;box-shadow:0 0 22px #ffffffaa;transform:scale(1.04)}
+.team.ok{outline:0;box-shadow:inset 0 0 0 5px #fff,0 0 14px #ffffff77;transform:none}
 .team.ng{opacity:.4;filter:saturate(.5)}
 .drop{font-weight:900}
 /* ランク */
@@ -97,3 +97,6 @@ body.screen-page #title{display:none} body.screen-page #head{height:100%;margin:
 body.screen-page #body{min-height:0;overflow:hidden} body.screen-page #body>.teams{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));height:100%;gap:clamp(6px,1vh,12px)} body.screen-page .team{min-height:0;padding:clamp(5px,.8vh,10px);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden} body.screen-page .team b{font-size:clamp(16px,2.5vh,28px);line-height:1.08} body.screen-page .team .ans{font-size:clamp(14px,2.1vh,23px);line-height:1.05;margin:3px 0} body.screen-page .team .badge{font-size:clamp(10px,1.5vh,15px);padding:2px 8px}
 .screen-statusline{position:relative;height:104px;min-height:104px;display:flex;align-items:center;justify-content:center;width:100%}.screen-status-main{width:100%;font-size:clamp(30px,4.7vh,50px);line-height:1.05;font-weight:900;text-align:center}.screen-timer-slot{width:300px;height:92px;display:flex;align-items:center;justify-content:center}.screen-timer{width:300px;height:92px;line-height:92px;text-align:center;font-size:clamp(60px,9vh,84px);font-variant-numeric:tabular-nums;font-weight:900}.screen-confirmed{position:absolute;right:0;top:50%;transform:translateY(-50%);width:290px;text-align:right;font-size:clamp(18px,2.5vh,28px);font-weight:900;color:#ddd}.screen-center-open{display:flex;align-items:center;justify-content:center;width:100%;height:100%}.screen-statusline.closed-state .screen-timer-slot,.screen-statusline.answer-state .screen-timer-slot,.screen-statusline.pre .screen-timer-slot{display:none}
 .vote-timer-slot{height:48px;min-height:48px;margin-top:8px;display:flex;align-items:center;justify-content:center}.vote-timer{height:40px;line-height:40px;font-size:32px;min-width:180px;font-weight:900;text-align:center;color:#ff7a7a;font-variant-numeric:tabular-nums}.screen-timer.warn10,.vote-timer.warn10{color:#f4d13d}.screen-timer.danger5,.vote-timer.danger5{color:#ff5a5a;text-shadow:0 0 18px #ff5a5a88}
+
+/* v11.6: 正解カードの外側グロー用の余白。内側の白枠は画面端でも切れない。 */
+body.screen-page #body>.teams{padding:4px}
