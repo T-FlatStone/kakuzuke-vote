@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.8">
+<link rel="stylesheet" href="style.css?v=11.9">
 <title>管理</title>
 </head>
 <body>
@@ -23,6 +23,9 @@
       <button type="button" class="ctrl danger" id="deleteTitleImage">画像を削除</button>
       <span id="titleImageStatus" class="muted"></span>
       <div id="titleImagePreview" class="asset-preview"></div>
+      <hr style="border-color:#ffffff22;margin:16px 0">
+      <label><b>タイトル後〜第1問前のスライド（複数可）</b> <input id="introSlideFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+      <div id="introSlidesPreview" class="slides-mini" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -55,7 +58,7 @@
   <section class="card">
     <h2>問題と正解</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>#</th><th>問題文</th><th>問題前スライド（複数可）</th><th>選択肢</th><th>正解</th><th>失敗時↓</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>問題文</th><th>問題画像（任意・1枚）</th><th>選択肢</th><th>正解</th><th>失敗時↓</th><th></th></tr></thead>
       <tbody id="qrows"></tbody>
     </table></div>
     <div class="row" style="margin-top:10px">
@@ -107,7 +110,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.8"></script>
+<script src="app.js?v=11.9"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
@@ -123,7 +126,7 @@ auth.onAuthStateChanged(async user => {
 });
 const $ = s => document.querySelector(s);
 let G = defaults;
-let teamRows = [], rankRows = [], rows = [], titleImagePath = "";
+let teamRows = [], rankRows = [], rows = [], titleImagePath = "", introSlides = [];
 let dirty = false;
 
 function setDirty(v) { dirty = v; $("#dirty").textContent = v ? "未保存の変更があります" : ""; }
@@ -215,13 +218,13 @@ function renderRows() {
     const opts = '<option value="">未設定</option>' + LETTERS.slice(0, q.n).map(x => '<option value="' + x + '"' + (q.answer === x ? ' selected' : '') + '>' + x + '</option>').join("");
     return '<tr data-i="' + i + '"><td><b>第' + (i + 1) + '問</b></td>' +
       '<td><input type="text" data-f="text" maxlength="80" value="' + esc(q.text) + '"></td>' +
-      '<td><div class="asset-mini slides-mini" data-qimg="' + i + '"></div><label class="ctrl sub asset-file">画像追加<input type="file" data-imgfile="' + i + '" accept="image/png,image/jpeg,image/webp" multiple hidden></label></td>' +
+      '<td><div class="asset-mini" data-qimg="' + i + '"></div><label class="ctrl sub asset-file">画像選択<input type="file" data-imgfile="' + i + '" accept="image/png,image/jpeg,image/webp" hidden></label> ' + (q.imagePath ? '<button type="button" class="ctrl danger" data-imgdel="' + i + '">削除</button>' : '') + '</td>' +
       '<td><select data-f="n"><option value="2"' + (q.n === 2 ? ' selected' : '') + '>A/B</option><option value="3"' + (q.n === 3 ? ' selected' : '') + '>A/B/C</option><option value="4"' + (q.n === 4 ? ' selected' : '') + '>A/B/C/D</option></select></td>' +
       '<td><select data-f="answer">' + opts + '</select></td>' +
       '<td><input type="number" data-f="penalty" min="0" max="10" value="' + q.penalty + '"></td>' +
       '<td style="white-space:nowrap"><button type="button" class="ctrl sub" data-act="up">↑</button><button type="button" class="ctrl sub" data-act="down">↓</button><button type="button" class="ctrl danger" data-act="del">✕</button></td></tr>';
   }).join("") || '<tr><td colspan="7" class="muted">問題がありません。「＋ 問題を追加」で追加してください。</td></tr>';
-  rows.forEach((q,i)=>renderSlidePreviews(i,q.slides||[]));
+  rows.forEach((q,i)=>{ if(q.imagePath) showAssetPreview(document.querySelector('[data-qimg="'+i+'"]'),q.imagePath); });
 }
 $("#qrows").addEventListener("input", e => {
   const tr = e.target.closest("tr"), f = e.target.dataset.f;
@@ -247,23 +250,19 @@ $("#qrows").addEventListener("click", e => {
   renderRows(); setDirty(true);
 });
 $("#qrows").addEventListener("change", async e => {
-  const i=+(e.target.dataset.imgfile??-1); if(i<0||!e.target.files?.length) return;
-  const files=[...e.target.files]; e.target.value="";
-  try { rows[i].slides=rows[i].slides||[]; for(const file of files){ rows[i].slides.push(await uploadAsset(file,"questions","q"+(i+1)+"_s"+(rows[i].slides.length+1))); } renderRows(); setDirty(true); }
-  catch(err){ alert(err.message||err); }
+  const i=+(e.target.dataset.imgfile??-1); if(i<0||!e.target.files?.[0]) return; const file=e.target.files[0]; e.target.value="";
+  try{const old=rows[i].imagePath;rows[i].imagePath=await uploadAsset(file,"questions","q"+(i+1));if(old)deleteAsset(old).catch(console.error);renderRows();setDirty(true);}catch(err){alert(err.message||err);}
 });
-$("#qrows").addEventListener("click", async e => {
-  const b=e.target.closest("button[data-slidedel]"); if(!b)return; const [qi,si]=b.dataset.slidedel.split(":").map(Number);
-  if(!confirm("このスライドを削除しますか？"))return;
-  const old=rows[qi].slides?.[si]; rows[qi].slides.splice(si,1); renderRows(); setDirty(true); if(old) deleteAsset(old).catch(console.error);
-});
-async function showAssetPreview(el,path){ if(!el||!path)return; try{const u=await storageUrl(path); const img=document.createElement("img");img.src=u;img.alt="プレビュー";el.replaceChildren(img);}catch(e){el.textContent="画像を取得できません";} }
-async function renderSlidePreviews(qi,paths){ const el=document.querySelector('[data-qimg="'+qi+'"]'); if(!el)return; el.innerHTML=""; for(let si=0;si<paths.length;si++){const item=document.createElement("div");item.className="slide-thumb"; const no=document.createElement("span");no.textContent=(si+1)+""; item.appendChild(no); try{const u=await storageUrl(paths[si]);const img=document.createElement("img");img.src=u;img.alt="スライド"+(si+1);item.appendChild(img);}catch(e){item.append("取得失敗");} const del=document.createElement("button");del.type="button";del.className="ctrl danger";del.dataset.slidedel=qi+":"+si;del.textContent="✕";item.appendChild(del);el.appendChild(item);} }
-function renderTitleImage(){ const el=$("#titleImagePreview"); el.innerHTML=""; $("#titleImageStatus").textContent=titleImagePath?titleImagePath:"未登録"; if(titleImagePath)showAssetPreview(el,titleImagePath); }
+$("#qrows").addEventListener("click", async e=>{const b=e.target.closest("button[data-imgdel]");if(!b)return;const i=+b.dataset.imgdel,old=rows[i].imagePath;if(!confirm("問題画像を削除しますか？"))return;rows[i].imagePath="";renderRows();setDirty(true);if(old)deleteAsset(old).catch(console.error);});
+async function showAssetPreview(el,path){if(!el||!path)return;try{const u=await storageUrl(path),img=document.createElement("img");img.src=u;img.alt="プレビュー";el.replaceChildren(img);}catch(e){el.textContent="画像を取得できません";}}
+async function renderIntroSlides(){const el=$("#introSlidesPreview");el.innerHTML="";for(let i=0;i<introSlides.length;i++){const item=document.createElement("div");item.className="slide-thumb";const no=document.createElement("span");no.textContent=i+1;item.appendChild(no);try{const u=await storageUrl(introSlides[i]),img=document.createElement("img");img.src=u;img.alt="オープニングスライド"+(i+1);item.appendChild(img);}catch(e){item.append("取得失敗");}const del=document.createElement("button");del.type="button";del.className="ctrl danger";del.dataset.introdel=i;del.textContent="✕";item.appendChild(del);el.appendChild(item);}}
+function renderTitleImage(){const el=$("#titleImagePreview");el.innerHTML="";$("#titleImageStatus").textContent=titleImagePath?titleImagePath:"未登録";if(titleImagePath)showAssetPreview(el,titleImagePath);renderIntroSlides();}
+$("#introSlideFiles").addEventListener("change",async e=>{const files=[...(e.target.files||[])];e.target.value="";try{for(const f of files)introSlides.push(await uploadAsset(f,"intro","s"+(introSlides.length+1)));renderIntroSlides();setDirty(true);}catch(err){alert(err.message||err);}});
+$("#introSlidesPreview").addEventListener("click",e=>{const b=e.target.closest("button[data-introdel]");if(!b)return;const i=+b.dataset.introdel,old=introSlides[i];if(!confirm("このスライドを削除しますか？"))return;introSlides.splice(i,1);renderIntroSlides();setDirty(true);if(old)deleteAsset(old).catch(console.error);});
 $("#titleImageFile").addEventListener("change",async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;try{const old=titleImagePath;titleImagePath=await uploadAsset(f,"title","title");if(old)deleteAsset(old).catch(console.error);renderTitleImage();setDirty(true);}catch(err){alert(err.message||err);}});
 $("#deleteTitleImage").addEventListener("click",()=>{if(!titleImagePath||!confirm("タイトル画像を削除しますか？"))return;const old=titleImagePath;titleImagePath="";renderTitleImage();setDirty(true);deleteAsset(old).catch(console.error);});
 $("#addQ").addEventListener("click", () => {
-  rows.push({ text: "", n: 2, answer: "", penalty: 1, slides: [] });
+  rows.push({ text: "", n: 2, answer: "", penalty: 1, imagePath: "" });
   renderRows(); setDirty(true);
   const inputs = document.querySelectorAll('#qrows input[data-f="text"]');
   if (inputs.length) inputs[inputs.length - 1].focus();
@@ -277,6 +276,7 @@ function fillEditor(s, title) {
   rankRows = s.ranks.map(r => ({ ...r }));
   rows = s.questions.map(q => ({ ...q }));
     titleImagePath = s.titleImagePath || "";
+    introSlides = (s.introSlides||[]).slice();
   $("#timer").value = s.timerSec;
   if (title != null) $("#title").value = title;
   renderTeams(); renderRanks(); renderRows(); renderTitleImage();
@@ -291,7 +291,7 @@ $("#reload").addEventListener("click", () => { if (!dirty || confirm("編集中�
 $("#saveSetup").addEventListener("click", async () => {
   const teams = teamRows.map(t => ({ id: t.id, name: String(t.name || "").trim(), language: t.language === "en" ? "en" : "ja", key: t.key || randomTeamKey() }));
   const ranks = rankRows.map(r => ({ name: String(r.nameJa || r.name || "").trim(), nameJa: String(r.nameJa || r.name || "").trim(), nameEn: String(r.nameEn || r.name || "").trim(), color: r.color }));
-  const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1), slides: (q.slides||[]).slice() }));
+  const questions = rows.map(q => ({ text: String(q.text || "").trim(), n: clampN(q.n), answer: q.answer || "", penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1), imagePath: String(q.imagePath||"") }));
   let i;
   if (!teams.length) return alert("チームが1つもありません");
   if ((i = teams.findIndex(t => !t.name)) >= 0) return alert("チーム「" + teams[i].id + "」の名前が未入力です");
@@ -305,12 +305,12 @@ $("#saveSetup").addEventListener("click", async () => {
   $("#dirty").textContent = "保存中...";
   try {
     await Promise.all([
-      db.ref("setup").set({ questions, timerSec, teams, ranks, titleImagePath }),
+      db.ref("setup").set({ questions, timerSec, teams, ranks, titleImagePath, introSlides }),
       db.ref("publicSetup").set({ timerSec, teams:teams.map(t=>({id:t.id,name:t.name,language:t.language})), ranks, questions:questions.map(q=>({text:q.text,n:q.n,penalty:q.penalty})) }),
       db.ref("teamKeys").set(Object.fromEntries(teams.map(t=>[t.id,t.key])))
     ]);
     await db.ref("game").update({ title: $("#title").value.trim() || defaults.title, total: questions.length });
-    fillEditor({ questions, timerSec, teams, ranks, titleImagePath });
+    fillEditor({ questions, timerSec, teams, ranks, titleImagePath, introSlides });
     setDirty(false);
     $("#dirty").textContent = "✔ 保存しました";
     setTimeout(() => { if (!dirty) $("#dirty").textContent = ""; }, 3000);
@@ -325,7 +325,7 @@ $("#saveSetup").addEventListener("click", async () => {
 });
 
 $("#exportJ").addEventListener("click", () => {
-  const data = { title: $("#title").value, titleImagePath, timerSec: clampInt($("#timer").value, 0, 600, 0), teams: teamRows, ranks: rankRows, questions: rows };
+  const data = { title: $("#title").value, titleImagePath, introSlides, timerSec: clampInt($("#timer").value, 0, 600, 0), teams: teamRows, ranks: rankRows, questions: rows };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   const d = new Date(); const z = n => String(n).padStart(2,"0");

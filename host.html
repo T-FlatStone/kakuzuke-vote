@@ -3,17 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.8">
+<link rel="stylesheet" href="style.css?v=11.9">
 <title>司会</title>
 </head>
 <body>
 <div id="loginView" class="auth-shell"><div class="auth-card"><h1>司会ログイン</h1><form id="loginForm"><label for="loginId">ID（メールアドレス）</label><input id="loginId" type="email" autocomplete="username" required><label for="loginPw">パスワード</label><input id="loginPw" type="password" autocomplete="current-password" required><button class="ctrl" type="submit">ログイン</button><div id="loginError" class="auth-error" aria-live="polite"></div></form></div></div>
 <main class="wrap" id="protectedApp" style="max-width:640px;display:none"><div class="auth-user"><span id="authWho"></span><button type="button" class="ctrl sub" id="logoutBtn">ログアウト</button></div>
-  <h1>司会 <small style="font-size:14px;color:#aaa">v11.8</small></h1>
+  <h1>司会 <small style="font-size:14px;color:#aaa">v11.9</small></h1>
   <div id="versionGuard" style="display:none;background:#8b1d1d;color:#fff;border:3px solid #ff6b6b;border-radius:14px;padding:16px;margin:12px 0;font-weight:900;font-size:20px">⚠ 古いシステムを検出しました。回答時間が計測されません。最新版を反映し、このページを再読み込みしてください。</div>
   <div class="card" id="info" aria-live="polite">読込中...</div>
   <div class="hostbtns">
-    <button type="button" class="hostbtn alt" id="bSlide" style="display:none" disabled>次のスライド</button>
     <button type="button" class="hostbtn" id="bStart" disabled>回答開始</button>
     <button type="button" class="hostbtn alt" id="bAnswer" disabled>正解発表</button>
     <button type="button" class="hostbtn next" id="bNext" disabled>次の問題へ</button>
@@ -25,7 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.8"></script>
+<script src="app.js?v=11.9"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) {
   document.querySelector("#versionGuard").style.display = "block";
@@ -64,12 +63,11 @@ function render(g) {
   $("#info").innerHTML = h;
   const manualClose = ph === "open" && !g.deadline;
   $("#bStart").textContent = manualClose ? "締め切る" : "回答開始";
-  $("#bStart").disabled = !(ph === "ready" || manualClose);
-  const slideN=q?.slides?.length||0; $("#bSlide").style.display=(ph==="ready"&&slideN>1)?"block":"none"; $("#bSlide").disabled=!(ph==="ready"&&(g.slideIndex||0)<slideN-1); $("#bSlide").textContent="次のスライド（"+Math.min((g.slideIndex||0)+1,slideN)+" / "+slideN+"）";
+  $("#bStart").disabled = !(ph === "ready" || manualClose); $("#bSlide").disabled=!(ph==="ready"&&(g.slideIndex||0)<slideN-1); $("#bSlide").textContent="次のスライド（"+Math.min((g.slideIndex||0)+1,slideN)+" / "+slideN+"）";
   $("#bAnswer").disabled = ph !== "closed";
   const isLast = g.current >= n && n > 0;
-  $("#bNext").textContent = ph === "rankboard" ? "最終結果発表" : g.current === 0 ? "第1問へ" : isLast ? "全チーム格付け表示" : "次の問題へ";
-  $("#bNext").disabled = n === 0 || !(ph === "lobby" || ph === "answer" || ph === "rankboard");
+  $("#bNext").textContent = ph === "intro" ? (((g.introIndex||0)<SETUP.introSlides.length-1)?"次のスライド":"第1問へ") : ph === "rankboard" ? "最終結果発表" : g.current === 0 ? (SETUP.introSlides.length?"オープニングへ":"第1問へ") : isLast ? "全チーム格付け表示" : "次の問題へ";
+  $("#bNext").disabled = n === 0 || !(ph === "lobby" || ph === "intro" || ph === "answer" || ph === "rankboard");
   $("#hint").textContent = n === 0 ? "問題が登録されていません。管理ページで登録してください。"
     : SETUP.timerSec > 0 ? "制限時間 " + SETUP.timerSec + " 秒（時間になると自動で締切）" : "制限時間なし（「締め切る」で手動締切）";
 }
@@ -78,10 +76,9 @@ function tick(g) {
   const el = $("#tm"); if (!el) return;
   const r = remainingSec(g); el.textContent = r == null ? "" : "残り " + r + " 秒";
 }
-$("#bSlide").addEventListener("click",()=>Ops.slide(G,1));
 $("#bStart").addEventListener("click", () => { if (phaseOf(G) === "open") Ops.close(G); else Ops.start(G); });
 $("#bAnswer").addEventListener("click", () => { const ans = SETUP.questions[G.current - 1]?.answer; if (ans && !confirm("正解「" + ans + "」を発表しますか？")) return; Ops.reveal(G); });
-$("#bNext").addEventListener("click", () => { const ph=phaseOf(G); if(ph==="rankboard"){ if(confirm("最終結果を発表しますか？"))Ops.final(); } else if (G.current >= SETUP.questions.length) Ops.rankboard(); else Ops.goto(G.current + 1); });
+$("#bNext").addEventListener("click", () => { const ph=phaseOf(G); if(ph==="rankboard"){ if(confirm("最終結果を発表しますか？"))Ops.final(); } else if(ph==="intro") Ops.introNext(G); else if(ph==="lobby") Ops.introStart(); else if (G.current >= SETUP.questions.length) Ops.rankboard(); else Ops.goto(G.current + 1); });
 // 認証成功後に開始
 </script>
 </body>

@@ -4,7 +4,7 @@ firebase.initializeApp(C.firebaseConfig);
 const db = firebase.database();
 const TS = firebase.database.ServerValue.TIMESTAMP;   // Firebaseサーバー側の時刻
 const APP_VERSION = 11;
-const APP_BUILD = "11.8";
+const APP_BUILD = "11.9";
 const storage = firebase.storage ? firebase.storage() : null;
 
 const teamParam = (new URLSearchParams(location.search).get("team") || "").trim().toUpperCase();
@@ -15,7 +15,7 @@ const clampN = n => clampInt(n, 2, 4, 2);
 const toArr = x => (Array.isArray(x) ? x : Object.values(x || {})).filter(Boolean);
 
 const defaults = { title: "格付けチェック", current: 0, total: 0, phase: "lobby", question: "", choices: ["A", "B"], answer: null, deadline: null, sessionId: "legacy" };
-const PHASE_LABEL = { lobby: "開始前", ready: "問題表示中", open: "回答受付中", closed: "締切", answer: "正解発表", rankboard: "全チーム格付け", final: "最終結果" };
+const PHASE_LABEL = { lobby: "開始前", ready: "問題表示中", open: "回答受付中", closed: "締切", answer: "正解発表", intro: "オープニング", rankboard: "全チーム格付け", final: "最終結果" };
 
 // ===== 初期値（管理画面で未設定のときに使う） =====
 const DEFAULT_RANK_NAMES = ["一流", "普通", "二流", "三流", "そっくりさん", "映す価値なし"];
@@ -47,10 +47,10 @@ function normalizeSetup(v) {
       text: String(q.text || ""), n: clampN(q.n),
       answer: LETTERS.includes(q.answer) ? q.answer : "",
       penalty: clampInt(q.penalty, 0, MAX_PENALTY, 1),
-      slides: toArr(q.slides).map(String).filter(Boolean).length ? toArr(q.slides).map(String).filter(Boolean) : (q.imagePath ? [String(q.imagePath)] : []),
-      imagePath: String(q.imagePath || "")
+      imagePath: String(q.imagePath || (toArr(q.slides)[0] || ""))
     })),
     titleImagePath: String(v.titleImagePath || ""),
+    introSlides: toArr(v.introSlides).map(String).filter(Boolean),
     timerSec: clampInt(v.timerSec, 0, 600, 0),
     teams: teams.length ? teams : defaultTeams(),
     ranks: ranks.length >= 2 ? ranks : defaultRanks()
@@ -213,9 +213,10 @@ function watchAll(onChange, onTick, onError) {
 function publicGameFrom(g) {
   const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
   SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
-  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",slideIndex:g.slideIndex||0};
+  const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks,sessionId:g.sessionId||"legacy",introIndex:g.introIndex||0};
   if(ph==="lobby" && SETUP.titleImagePath) out.imagePath=SETUP.titleImagePath;
-  if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1], slides=cq?.slides||[]; if(slides.length){ out.imagePath=slides[Math.min(g.slideIndex||0,slides.length-1)]; out.slideCount=slides.length; } }
+  if(ph==="intro" && SETUP.introSlides.length){ out.imagePath=SETUP.introSlides[Math.min(g.introIndex||0,SETUP.introSlides.length-1)]; out.introCount=SETUP.introSlides.length; }
+  if(ph==="ready"){ const cq=SETUP.questions[(g.current||1)-1]; if(cq?.imagePath) out.imagePath=cq.imagePath; }
   if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
   if(ph==="answer") out.answer=g.answer||null;
   return out;
@@ -249,7 +250,7 @@ const Ops = {
     if (!q) { alert("第" + i + "問は登録されていません"); return; }
     return db.ref("game").update({
       current: i, total: SETUP.questions.length, question: q.text || "",
-      choices: LETTERS.slice(0, clampN(q.n)), phase: "ready", slideIndex: 0, answer: null, deadline: null
+      choices: LETTERS.slice(0, clampN(q.n)), phase: "ready", answer: null, deadline: null
     });
   },
   start(g, sec) {
@@ -274,7 +275,8 @@ const Ops = {
       ["closed/" + g.current]: closedAt
     });
   },
-  slide(g, dir=1) { const q=SETUP.questions[g.current-1], n=q?.slides?.length||0; if(!n)return Promise.resolve(); return db.ref("game/slideIndex").set(Math.max(0,Math.min(n-1,(g.slideIndex||0)+dir))); },
+  introStart() { return SETUP.introSlides.length ? db.ref("game").update({phase:"intro",introIndex:0,current:0,deadline:null}) : this.goto(1); },
+  introNext(g) { const n=SETUP.introSlides.length, i=g.introIndex||0; return i<n-1 ? db.ref("game/introIndex").set(i+1) : this.goto(1); },
   rankboard() { return db.ref("game").update({ phase: "rankboard", deadline: null }); },
   final() { return db.ref("game").update({ phase: "final", deadline: null }); },
   lobby() { return db.ref("game").update({ phase: "lobby", deadline: null }); },
