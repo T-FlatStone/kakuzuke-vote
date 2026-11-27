@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.3">
+<link rel="stylesheet" href="style.css?v=11.5">
 <title>管理</title>
 </head>
 <body>
@@ -99,7 +99,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <script>window.KAKUZUKE_PRIVATE = true;</script>
-<script src="app.js?v=11.3"></script>
+<script src="app.js?v=11.5"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 const ADMIN_UID = C.roles?.adminUid || "";
@@ -109,7 +109,12 @@ document.querySelector("#loginForm").addEventListener("submit", async e => { e.p
 document.querySelector("#logoutBtn").addEventListener("click", () => auth.signOut());
 auth.onAuthStateChanged(async user => {
   if (!user) { loginView.style.display="block"; protectedApp.style.display="none"; return; }
-  if (user.uid !== ADMIN_UID) { loginError.textContent="このアカウントには管理者権限がありません。"; await auth.signOut(); return; }
+  if (user.uid !== ADMIN_UID) {
+    loginError.textContent = user.isAnonymous ? "投票用の匿名セッションを検出しました。管理者IDでログインしてください。" : "このアカウントには管理者権限がありません。";
+    loginView.style.display="block"; protectedApp.style.display="none";
+    if (!window.__adminSigningOut) { window.__adminSigningOut=true; await auth.signOut(); window.__adminSigningOut=false; }
+    return;
+  }
   document.querySelector("#authWho").textContent = user.email || "Admin"; loginView.style.display="none"; protectedApp.style.display="block";
   if (!window.__adminStarted) { window.__adminStarted=true; loadSetup(); watchAll(renderGame, tick); }
 });

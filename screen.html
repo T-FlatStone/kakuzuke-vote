@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="style.css?v=11.3">
+<link rel="stylesheet" href="style.css?v=11.5">
 <title>格付けチェック スクリーン</title>
 </head>
 <body class="screen-page">
@@ -15,7 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11.3"></script>
+<script src="app.js?v=11.5"></script>
 <script>
 if (typeof APP_VERSION === "undefined" || APP_VERSION < 11) alert("app.js が古いバージョンです。最新の app.js をアップロードして Ctrl+F5 で再読み込みしてください。");
 let finalShown = false;   // 最終結果のアニメーションを1回だけ再生するため
@@ -35,16 +35,24 @@ function render(g) {
     return;
   }
 
-  // 最終結果は公開済みの集計結果だけを使用
+  // 最終結果。空ランクでも止めず、publicResultsの生成遅延も待つ。
   if (ph === "final") {
-    if (finalShown) return; finalShown=true;
-    db.ref("publicResults").once("value").then(snap=>{
-      const rr=snap.val()||{}, best=toArr(rr.best), groups=toArr(rr.groups);
-      head.innerHTML='<div class="big gold">最終結果発表</div><p class="center muted">同じ格付けなら、回答時間の合計が短いチームが上位</p>';
-      body.innerHTML='<div class="best">'+best.map((x,i)=>'<div class="place'+(x.place===1?' p1':'')+'" style="animation-delay:'+(1+i*2.5)+'s"><span class="no">'+x.place+'位</span><span class="nm">'+esc(x.name)+'</span>'+rankBadge(x.rank)+'<span class="sec">合計 '+fmtSec(x.ms)+'</span></div>').join('')+'</div><h2 class="gold">全チームの格付け</h2><div class="rankgrid">'+groups.map(gr=>'<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(gr.rank.name)+'（'+gr.names.length+'）</h3>'+gr.names.map(n=>'<span class="t">'+esc(n)+'</span>').join('')+'</div>').join('')+'</div>';
-    }); return;
+    if (finalShown) return;
+    finalShown = true;
+    head.innerHTML='<div class="big gold">最終結果発表</div><p class="center muted">同じ格付けなら、回答時間の合計が短いチームが上位</p>';
+    body.innerHTML='<p class="center muted">結果を集計しています...</p>';
+    const loadResults=(tryNo=0)=>{
+      db.ref("publicResults").once("value").then(snap=>{
+        const rr=snap.val()||{}, best=toArr(rr.best).sort((a,b)=>b.place-a.place), groups=toArr(rr.groups);
+        if(!best.length && tryNo<8){setTimeout(()=>loadResults(tryNo+1),500);return;}
+        const bestHtml=best.map((x,i)=>'<div class="place'+(x.place===1?' p1':'')+'" style="animation-delay:'+(0.5+i*2.2)+'s"><span class="no">'+x.place+'位</span><span class="nm">'+esc(x.name)+'</span>'+rankBadge(x.rank)+'<span class="sec">合計 '+fmtSec(x.ms)+'</span></div>').join('');
+        const groupHtml=groups.map(gr=>{const names=toArr(gr.names),count=Number.isFinite(gr.count)?gr.count:names.length;return '<div class="rankbox" style="'+rankStyle(gr.rank)+'"><h3>'+esc(gr.rank.name)+'（'+count+'）</h3>'+names.map(n=>'<span class="t">'+esc(n)+'</span>').join('')+'</div>';}).join('');
+        body.innerHTML='<div class="best">'+bestHtml+'</div><h2 class="gold">全チームの格付け</h2><div class="rankgrid">'+groupHtml+'</div>';
+      }).catch(e=>{console.error(e);finalShown=false;body.innerHTML='<p class="center warn">最終結果を取得できませんでした。再読み込みしてください。</p>';});
+    };
+    loadResults();
+    return;
   }
-
   let statusHtml;
   if (ph === "open") statusHtml = '<div class="screen-statusline open-state"><div class="screen-center-open"><div class="screen-timer-slot"><div class="screen-timer" id="tm"></div></div></div><div class="screen-confirmed">' + Object.keys(g.confirmed || {}).length + ' / ' + SETUP.teams.length + ' チーム回答済み</div></div>';
   else if (ph === "closed") statusHtml = '<div class="screen-statusline closed-state"><div class="screen-status-main">締切！</div></div>';
@@ -57,7 +65,7 @@ function render(g) {
     const r = SETUP.ranks[g.rankIndexes?.[t.id] ?? 0] || SETUP.ranks[0];
     let cls = "team", txt, style;
     if (ph === "answer") {
-      const ok = v === g.answer, d = dropOf(g, t.id);
+      const ok = v === g.answer, d = g.drops?.[t.id] ?? (ok ? 0 : 1);
       cls += ok ? " ok" : " ng";
       txt = (v ? esc(v) + " " + (ok ? "⭕" : "❌") : "未投票 ❌") + (d > 0 ? ' <span class="drop">↓' + d + '</span>' : '');
       style = choiceStyle(v);

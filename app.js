@@ -181,17 +181,21 @@ function watchAll(onChange, onTick, onError) {
 
 // Admin/Hostだけが非公開gameから、表示に必要な安全なデータへ同期する。
 function publicGameFrom(g) {
-  const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {};
-  SETUP.teams.forEach(t => { if (confirmOf(g,g.current,t.id)) confirmed[t.id]=true; ranks[t.id]=rankIndex(g,t.id); });
+  const ph = phaseOf(g), q = String(g.current || 0), confirmed = {}, ranks = {}, drops = {};
+  SETUP.teams.forEach(t => {
+    if (confirmOf(g, g.current, t.id)) confirmed[t.id] = true;
+    ranks[t.id] = rankIndex(g, t.id);
+    if (ph === "answer") drops[t.id] = dropOf(g, t.id);
+  });
   const out={title:g.title,current:g.current,total:g.total,phase:ph,question:g.question,choices:g.choices||[],deadline:g.deadline||null,confirmed,rankIndexes:ranks};
   if(ph==="closed"||ph==="answer") out.revealedVotes=g.votes?.[q]||{};
-  if(ph==="answer") out.answer=g.answer||null;
+  if(ph==="answer") { out.answer=g.answer||null; out.drops=drops; }
   return out;
 }
 function publicResultsFrom(g) {
   const best=standings(g).filter(x=>x.place<=BEST_N).map(x=>({place:x.place,name:x.team.name,rank:SETUP.ranks[x.ri],ms:x.ms}));
-  const groups=rankGroups(g).map(gr=>({rank:gr.rank,names:gr.teams.map(t=>t.name)}));
-  return {best,groups};
+  const groups=rankGroups(g).map(gr=>({rank:gr.rank,count:gr.teams.length,names:gr.teams.map(t=>t.name)}));
+  return {best,groups,generatedAt:serverNow()};
 }
 let lastPublic="";
 function syncPublic(g){
